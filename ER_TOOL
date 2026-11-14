@@ -29,7 +29,7 @@ local CAM = workspace.CurrentCamera
 -- ═══════════════════════════════════════
 --  Persistence — URL ثابت
 -- ═══════════════════════════════════════
-local SCRIPT_URL = "https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"
+local SCRIPT_URL = "https://raw.githubusercontent.com/hmoodqisii/er/main/ER_IOS11"
 
 local function queueSelf()
     if not queue_on_teleport then return end
@@ -50,7 +50,6 @@ end
 --  منع التشغيل المزدوج
 -- ═══════════════════════════════════════
 if _G.ER_LOADED then
-    -- مسح النسخة القديمة أولاً
     if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end
 end
 _G.ER_LOADED = true
@@ -114,37 +113,25 @@ local function uistroke(p, col, th, tr)
 end
 
 -- ═══════════════════════════════════════
---  Device Spoofer
+--  Device Spoofer (غير مفعل تلقائياً عند التشغيل)
 -- ═══════════════════════════════════════
 local VALID = {Console=true, Mobile=true, PC=true}
 local CFG   = "er_dspoofcfg_v5.bin"
 
 local spoof = {
-    device  = nil,
+    device  = nil, -- يبدأ فارغاً حتى يتم الاختيار يدوياً
     SD      = nil,
     hooked  = false,
     cleanup = nil,
     patches = 0,
 }
 
-local function cfgLoad()
-    if not readfile then return nil end
-    local ok, v = pcall(function() return readfile(CFG) end)
-    if ok and v then
-        local d = v:match("^%s*(%a+)%s*$")
-        if d and VALID[d] then return d end
-    end
-    return nil
-end
-
 local function cfgSave(d)
     if writefile then pcall(function() writefile(CFG, d) end) end
 end
 
-spoof.device = cfgLoad()
-
 local function gcWalk(device)
-    if not getgc then return 0 end
+    if not getgc or not device then return 0 end
     local ok, pool = pcall(function() return getgc(true) end)
     if not ok or type(pool) ~= "table" then return 0 end
     local n = 0
@@ -229,7 +216,6 @@ local function hookSD(SD, device, cb)
     return false
 end
 
--- queue للـ teleport: spoof فقط (أسرع وأخف)
 local function queueSpoof(device)
     if not queue_on_teleport then return end
     local code = string.format([[
@@ -241,7 +227,7 @@ local function queueSpoof(device)
     pcall(function() queue_on_teleport(code) end)
 end
 
--- تهيئة hook
+-- تهيئة مرجع SetDevice فقط بدون تفعيل التزييف تلقائياً
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
     local Rem  = RS:WaitForChild("Remotes", 25)
@@ -250,16 +236,12 @@ task.spawn(function()
     if not Repl then return end
     local SD   = Repl:WaitForChild("SetDevice", 25)
     if not SD  then return end
-    if spoof.device then hookSD(SD, spoof.device, function(n) spoof.patches = n end) end
-    task.wait(0.8)
-    if spoof.device then spoof.patches = gcWalk(spoof.device) end
+    spoof.SD = SD
 end)
 
 -- ═══════════════════════════════════════
 --  Intro Screen
 -- ═══════════════════════════════════════
--- نتحقق ما اتشغل من قبل في نفس الجلسة
-local introShownBefore = _G.ER_INTRO_SHOWN == true
 if not _G.ER_INTRO_SHOWN then
     _G.ER_INTRO_SHOWN = true
 
@@ -353,7 +335,7 @@ if not _G.ER_INTRO_SHOWN then
         end)
         matSlide:Play()
 
-        task.wait(5.8)
+        task.wait(4.5)
         matOn=false; glowT:Cancel(); matSlide:Cancel()
         for _, o in ipairs({erTxt,byTxt,matrixLbl,creditTxt}) do tw(o,TM,{TextTransparency=1}) end
         local fade = TweenService:Create(introBG, TSL, {BackgroundTransparency=1})
@@ -361,143 +343,6 @@ if not _G.ER_INTRO_SHOWN then
         fade.Completed:Once(function() introGui:Destroy() end)
     end)
 end
-
--- ═══════════════════════════════════════
---  Warning Screen
--- ═══════════════════════════════════════
-local wGui = mk("ScreenGui", {
-    Name="ER_Warn", ResetOnSpawn=false,
-    IgnoreGuiInset=true, DisplayOrder=1500000
-}, PG)
-
-local wBlur = mk("BlurEffect", {Size=0, Name="ER_Blur"}, Lighting)
-
-local wPanel = mk("Frame", {
-    Size=UDim2.fromOffset(450,540),
-    Position=UDim2.new(0.5,-225,0.5,-270),
-    BackgroundColor3=Color3.fromRGB(12,12,18),
-    BackgroundTransparency=1, BorderSizePixel=0
-}, wGui)
-corner(wPanel, 16)
-local wSK = uistroke(wPanel, Color3.fromRGB(255,55,55), 1.5, 1)
-
-local function wL(text, y, h, col, font)
-    return mk("TextLabel", {
-        Size=UDim2.new(0.9,0,0,h or 36),
-        Position=UDim2.new(0.05,0,0,y),
-        BackgroundTransparency=1, Text=text,
-        TextColor3=col or C.TEXT, TextScaled=true,
-        Font=font or Enum.Font.Gotham, TextTransparency=1
-    }, wPanel)
-end
-
-local wIcon  = wL("⚠️",14,52)
-local wA1    = wL("أنا غير مسؤول عن أي حظر أو عواقب",72,42,Color3.fromRGB(255,75,75),Enum.Font.GothamBold)
-local wE1    = wL("I am not responsible for any ban or consequences",118,26,Color3.fromRGB(175,95,95))
-local wA2    = wL("PC: F=تتبع  G=حائط  |  جوال: اضغط الأزرار",158,38,Color3.fromRGB(215,215,215),Enum.Font.GothamMedium)
-local wE2    = wL("PC: F=LockOn  G=WallHop  |  Mobile: tap buttons",200,26,Color3.fromRGB(145,145,145))
-local wExHdr = wL("🛠  دعم الـ Executor",238,24,C.GOLD,Enum.Font.GothamBold)
-local wEx1   = wL("✅  Lock-On / WallHop / FPS  →  Xeno · Solara (auto)",266,22,C.GREEN)
-local wEx2   = wL("⚠️  Device Spoofer  →  Synapse X / Wave (hookfunction)",292,22,C.GOLD)
-local wEx3   = wL("🔁  Teleport Persistence  →  queue_on_teleport required",318,22,Color3.fromRGB(140,180,255))
-
-local function wBtn(text, x, w, col)
-    local b = mk("TextButton", {
-        Size=UDim2.fromOffset(w or 180,44),
-        Position=UDim2.new(0,x,0,354),
-        BackgroundColor3=col or Color3.fromRGB(32,32,44),
-        Text=text, TextColor3=C.TEXT, TextScaled=true,
-        Font=Enum.Font.GothamBold,
-        BackgroundTransparency=1, TextTransparency=1,
-        AutoButtonColor=false
-    }, wPanel)
-    corner(b, 10)
-    return b
-end
-
-local wPC  = wBtn("💻 PC",22,180)
-local wMob = wBtn("📱 Mobile",234,180)
-local wFPS = wBtn("⚡ FPS",110,210,Color3.fromRGB(38,100,42))
-wFPS.Position = UDim2.new(0,110,0,415)
-local wFpsN = wL("يزيد الفريمات فقط — لا يقلل البينق",466,24,Color3.fromRGB(220,185,45),Enum.Font.GothamMedium)
-local wFpsE = wL("FPS only — does NOT reduce ping",494,20,Color3.fromRGB(160,140,45))
-
-local wDelay = introShownBefore and 0.5 or 5.9
-task.delay(wDelay, function()
-    tw(wBlur,  TSL, {Size=20})
-    tw(wPanel, TSL, {BackgroundTransparency=0.06})
-    tw(wSK,    TSL, {Transparency=0.4})
-    for _, o in ipairs({wIcon,wA1,wE1,wA2,wE2,wExHdr,wEx1,wEx2,wEx3,wFpsN,wFpsE}) do
-        tw(o,TSL,{TextTransparency=0})
-    end
-    for _, b in ipairs({wPC,wMob,wFPS}) do
-        tw(b,TSL,{BackgroundTransparency=0,TextTransparency=0})
-    end
-    sfx(SFX_BTN)
-end)
-
--- حفظ إعدادات الإضاءة الأصلية
-local origLighting = {
-    GlobalShadows = Lighting.GlobalShadows,
-    Brightness    = Lighting.Brightness,
-    FogEnd        = Lighting.FogEnd,
-}
-local origEffects = {}
-for _, v in pairs(Lighting:GetDescendants()) do
-    if v.Name == "ER_Blur" then continue end
-    if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect")
-    or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
-        origEffects[v] = v.Enabled
-    elseif v:IsA("Atmosphere") then
-        origEffects[v] = v.Density
-    end
-end
-local fpsActive = false
-
-wFPS.MouseButton1Click:Connect(function()
-    sfx(SFX_BTN)
-    if not fpsActive then
-        fpsActive = true
-        Lighting.GlobalShadows=false; Lighting.Brightness=2; Lighting.FogEnd=9e9
-        for _, v in pairs(Lighting:GetDescendants()) do
-            if v.Name=="ER_Blur" then continue end
-            if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect")
-            or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then v.Enabled=false
-            elseif v:IsA("Atmosphere") then v.Density=0 end
-        end
-        wFPS.Text="Boosted ✅"; wFPS.BackgroundColor3=Color3.fromRGB(28,78,32)
-    else
-        fpsActive = false
-        Lighting.GlobalShadows=origLighting.GlobalShadows
-        Lighting.Brightness=origLighting.Brightness
-        Lighting.FogEnd=origLighting.FogEnd
-        for v, val in pairs(origEffects) do
-            pcall(function()
-                if v:IsA("Atmosphere") then v.Density=val else v.Enabled=val end
-            end)
-        end
-        wFPS.Text="⚡ FPS"; wFPS.BackgroundColor3=Color3.fromRGB(38,100,42)
-    end
-end)
-
-local function closeWarn()
-    sfx(SFX_BTN)
-    tw(wBlur,TM,{Size=0}); tw(wPanel,TM,{BackgroundTransparency=1}); tw(wSK,TM,{Transparency=1})
-    for _, o in ipairs({wIcon,wA1,wE1,wA2,wE2,wExHdr,wEx1,wEx2,wEx3,wFpsN,wFpsE}) do tw(o,TM,{TextTransparency=1}) end
-    for _, b in ipairs({wPC,wMob,wFPS}) do tw(b,TM,{BackgroundTransparency=1,TextTransparency=1}) end
-    task.delay(0.3, function() wBlur:Destroy(); wGui:Destroy() end)
-end
-wPC.MouseButton1Click:Connect(function()
-    -- PC: keyboard mode
-    if UIS.MouseEnabled == false then
-        -- على الموبايل لا يتغير
-    end
-    closeWarn()
-end)
-wMob.MouseButton1Click:Connect(function()
-    -- Mobile: touch mode (لا يحتاج تغيير — الجهاز يتعامل معه تلقائي)
-    closeWarn()
-end)
 
 -- ═══════════════════════════════════════
 --  MAIN GUI
@@ -515,67 +360,54 @@ _G.ER_CLEANUP = function()
         local hl = CoreGui:FindFirstChild("ER_TargetESP")
         if hl then hl:Destroy() end
     end)
-    -- استعادة إعدادات الإضاءة لو FPS كان مفعلاً
-    if fpsActive then
-        pcall(function()
-            Lighting.GlobalShadows=origLighting.GlobalShadows
-            Lighting.Brightness=origLighting.Brightness
-            Lighting.FogEnd=origLighting.FogEnd
-            for v, val in pairs(origEffects) do
-                if v:IsA("Atmosphere") then v.Density=val else v.Enabled=val end
-            end
-        end)
-    end
     _G.ER_LOADED = false
 end
 
--- ─── Collapse Button (يمين) ────────────
-local CBTN_SZ, CBTN_PAD = 50, 12
+-- ─── Collapse Button (شكل دائري نظيف بدون مربعات زائدة) ────────────
+local CBTN_SZ, CBTN_PAD = 48, 14
 
 local cBtn = mk("TextButton", {
     Size=UDim2.fromOffset(CBTN_SZ,CBTN_SZ),
     Position=UDim2.new(1,-(CBTN_SZ+CBTN_PAD),0.5,-CBTN_SZ/2),
-    BackgroundColor3=C.BG, Text="",
-    AutoButtonColor=false, ZIndex=20
+    BackgroundColor3=C.SURF,
+    Text="ER",
+    TextColor3=C.GREEN,
+    Font=Enum.Font.GothamBlack,
+    TextSize=15,
+    AutoButtonColor=false,
+    ClipsDescendants=true,
+    ZIndex=20
 }, mainGui)
-corner(cBtn, 14)
-local cSK = uistroke(cBtn, C.GREEN, 1.5, 0.65)
+-- جعله دائرياً بالكامل
+corner(cBtn, CBTN_SZ / 2)
+local cSK = uistroke(cBtn, C.GREEN, 1.8, 0.35)
 
--- مربع أخضر داخل الزر (بدون كتابة)
-local cIconOuter = mk("Frame", {
-    Size=UDim2.fromOffset(28,28),
-    Position=UDim2.new(0.5,-14,0.5,-14),
-    BackgroundColor3=C.GREEN, BackgroundTransparency=0.15,
-    BorderSizePixel=0, ZIndex=21
-}, cBtn)
-corner(cIconOuter, 8)
-
-local cIconInner = mk("Frame", {
-    Size=UDim2.fromOffset(14,14),
-    Position=UDim2.new(0.5,-7,0.5,-7),
-    BackgroundColor3=C.GREEN, BorderSizePixel=0, ZIndex=22
-}, cIconOuter)
-corner(cIconInner, 4)
-
-local cGlow = mk("ImageLabel", {
-    Size=UDim2.new(2.8,0,2.8,0),
-    Position=UDim2.new(-0.9,0,-0.9,0),
-    BackgroundTransparency=1,
-    Image="rbxassetid://6015897843",
-    ImageColor3=C.GREEN, ImageTransparency=0.70, ZIndex=0
+-- تدرج خفيف داخل الزر
+mk("UIGradient", {
+    Rotation = 45,
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 34, 48)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 20)),
+    })
 }, cBtn)
 
 task.spawn(function()
     while mainGui.Parent do
-        tw(cGlow, ti(1.1,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut), {ImageTransparency=0.42})
-        task.wait(1.1)
-        tw(cGlow, ti(1.1,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut), {ImageTransparency=0.78})
-        task.wait(1.1)
+        tw(cSK, ti(1.2,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut), {Transparency=0.1})
+        task.wait(1.2)
+        tw(cSK, ti(1.2,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut), {Transparency=0.55})
+        task.wait(1.2)
     end
 end)
 
-cBtn.MouseEnter:Connect(function() tw(cSK,TF,{Transparency=0.15}); tw(cGlow,TF,{ImageTransparency=0.28}) end)
-cBtn.MouseLeave:Connect(function() tw(cSK,TF,{Transparency=0.65}); tw(cGlow,TF,{ImageTransparency=0.70}) end)
+cBtn.MouseEnter:Connect(function()
+    tw(cBtn, TF, {BackgroundColor3=Color3.fromRGB(24, 30, 42)})
+    tw(cSK, TF, {Thickness=2.2, Transparency=0})
+end)
+cBtn.MouseLeave:Connect(function()
+    tw(cBtn, TF, {BackgroundColor3=C.SURF})
+    tw(cSK, TF, {Thickness=1.8, Transparency=0.35})
+end)
 
 -- ─── Panel ─────────────────────────────
 local PW, PH = 300, 462
@@ -731,7 +563,7 @@ mk("TextLabel", {
 
 local spoofStatusLbl = mk("TextLabel", {
     Size=UDim2.new(1,-32,0,18), Position=UDim2.fromOffset(16,218),
-    BackgroundTransparency=1, Text="جارٍ تهيئة الـ Hook...",
+    BackgroundTransparency=1, Text="غير مفعل — اختر جهازاً يدوياً",
     TextColor3=C.MUTED, TextSize=10, Font=Enum.Font.Gotham,
     TextXAlignment=Enum.TextXAlignment.Left, ZIndex=16
 }, panel)
@@ -887,7 +719,7 @@ resHandle.MouseLeave:Connect(function()
 end)
 
 -- ═══════════════════════════════════════
---  Input events مجمّعة (تقليل استهلاك الموارد)
+--  Input events مجمّعة
 -- ═══════════════════════════════════════
 local pDragging=false; local pDragSt,pOrigPos; local pDragDist=0
 local detached=false; local panelOpen=false
@@ -903,7 +735,7 @@ local function openPanel()
     panel.Position=UDim2.new(1,10,0.5,-PH/2)
     tw(panel,TSP,{Position=panelOpenPos()})
     tw(pSK,TM,{Transparency=0.70})
-    tw(cSK,TM,{Color=C.GREEN,Transparency=0.1})
+    tw(cSK,TM,{Color=C.GREEN,Transparency=0})
     sfx(SFX_BTN)
 end
 
@@ -911,7 +743,7 @@ local function closePanel()
     panelOpen=false; detached=false
     tw(panel,TSL,{Position=UDim2.new(1,panel.AbsoluteSize.X+30,0.5,-PH/2)})
     tw(pSK,TM,{Transparency=0.88})
-    tw(cSK,TM,{Color=C.GREEN,Transparency=0.65})
+    tw(cSK,TM,{Color=C.GREEN,Transparency=0.35})
     task.delay(0.46, function() if not panelOpen then panel.Visible=false end end)
     sfx(SFX_BTN)
 end
@@ -943,13 +775,11 @@ panel.InputEnded:Connect(function(inp)
     end
 end)
 
--- event واحد مجمّع للـ InputChanged
 UIS.InputChanged:Connect(function(inp)
     local t=inp.UserInputType
     local isMouse = t==Enum.UserInputType.MouseMovement
     local isTouch = t==Enum.UserInputType.Touch
 
-    -- Drag panel
     if pDragging and (isMouse or isTouch) then
         local delta=inp.Position-pDragSt
         pDragDist=delta.Magnitude
@@ -965,7 +795,6 @@ UIS.InputChanged:Connect(function(inp)
         end
     end
 
-    -- Resize
     if resizing and (isMouse or isTouch) then
         local d=inp.Position-resSt
         local nW=math.clamp(resOriW+d.X, MIN_W, MAX_W)
@@ -1094,7 +923,6 @@ task.spawn(function()
     end
 end)
 
--- Heartbeat للـ lock-on (بدل RunService.Heartbeat المستمر — يتحقق أولاً)
 RunService.Heartbeat:Connect(function()
     if not lockOn() or not lp.Character then return end
     local char=lp.Character
@@ -1159,16 +987,19 @@ UIS.JumpRequest:Connect(function()
 end)
 
 -- ═══════════════════════════════════════
---  Status update (كل 3 ثواني بدل 2)
+--  Status update
 -- ═══════════════════════════════════════
 task.spawn(function()
     while mainGui.Parent do
         task.wait(3)
-        if spoof.patches>0 then
+        if spoof.device and spoof.patches>0 then
             spoofStatusLbl.Text=string.format("✅ %s — %d كائن",spoof.device,spoof.patches)
             spoofStatusLbl.TextColor3=C.GREEN
-        elseif spoof.hooked then
+        elseif spoof.device and spoof.hooked then
             spoofStatusLbl.Text="Hook جاهز — ينتظر SetDevice"
+            spoofStatusLbl.TextColor3=C.MUTED
+        else
+            spoofStatusLbl.Text="غير مفعل — اختر جهازاً يدوياً"
             spoofStatusLbl.TextColor3=C.MUTED
         end
     end
@@ -1178,4 +1009,3 @@ end)
 --  Persistence
 -- ═══════════════════════════════════════
 queueSelf()
--- queueSpoof يُستدعى فقط عند تغيير الجهاز يدوياً (داخل btn.MouseButton1Click)
