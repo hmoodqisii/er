@@ -1,11 +1,9 @@
 --[[
 ╔══════════════════════════════════════════════════════════╗
-║              ER Script v5.1 — by bww-o                   ║
-║  Lock-On · WallHop · FPS · Advanced Device Spoofer      ║
+║              ER Script v5.1  —  by bww-o                 ║
+║  Lock-On · WallHop · FPS · Device Spoofer (Fast GitHub)  ║
 ╚══════════════════════════════════════════════════════════╝
 ]]
-
-if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -21,35 +19,26 @@ local Debris = game:GetService("Debris")
 local lp = Players.LocalPlayer
 local PG = lp:WaitForChild("PlayerGui")
 local CAM = workspace.CurrentCamera
+
+-- استخدام رابط بديل مباشر أو تفعيل التخزين المؤقت السريع للـ GitHub لتجاوز أي بطء
 local SCRIPT_URL = "https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"
 
--- [Debug Logging System]
-local function logDebug(stage, msg)
-    print(string.format("[ER-DEBUG][%s]: %s", stage, tostring(msg)))
-end
-
--- [True Join & Queue System]
+-- تسريع وتحسين آلية الحفظ والـ Teleport بدون تأخيرات غير ضرورية
 local function queueSelf()
-    if not queue_on_teleport then
-        logDebug("Queue", "queue_on_teleport غير متوفر في هذا المشغل.")
-        return
-    end
+    if not queue_on_teleport then return end
     local code = string.format([[
 if not game:IsLoaded() then game.Loaded:Wait() end
-task.wait(2.0)
-local ok, err = pcall(function() loadstring(game:HttpGet("%s"))() end)
-if not ok then warn("[ER-Queue] "..tostring(err)) end
+task.spawn(function()
+    local ok, err = pcall(function() loadstring(game:HttpGet("%s", true))() end)
+    if not ok then warn("[ER] "..tostring(err)) end
+end)
 ]], SCRIPT_URL)
-    pcall(function()
-        queue_on_teleport(code)
-        logDebug("Queue", "تمت إضافة الكود لـ queue_on_teleport بنجاح.")
-    end)
+    pcall(function() queue_on_teleport(code) end)
 end
 
--- منع التشغيل المزدوج والتنظيف الآمن
+-- منع التشغيل المزدوج
 if _G.ER_LOADED then
     if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end
-    logDebug("Init", "تم تنظيف النسخة القديمة بنجاح.")
 end
 _G.ER_LOADED = true
 
@@ -66,11 +55,20 @@ local SFX_DETACH = 12221944
 local SFX_BTN = 12221967
 
 local C = {
-    BG = Color3.fromRGB(9, 9, 14), SURF = Color3.fromRGB(16, 17, 26), TEXT = Color3.fromRGB(228, 230, 244),
-    MUTED = Color3.fromRGB(90, 92, 118), BORDER = Color3.fromRGB(255, 255, 255), GREEN = Color3.fromRGB(45, 215, 90),
-    BLUE = Color3.fromRGB(55, 135, 255), GOLD = Color3.fromRGB(238, 185, 42), RED = Color3.fromRGB(215, 55, 55),
-    IDLE = Color3.fromRGB(20, 22, 34), PEND = Color3.fromRGB(215, 105, 20),
-    CONS = Color3.fromRGB(95, 55, 195), MOB = Color3.fromRGB(25, 145, 215), PC_COL = Color3.fromRGB(38, 175, 85),
+    BG = Color3.fromRGB(9, 9, 14),
+    SURF = Color3.fromRGB(16, 17, 26),
+    TEXT = Color3.fromRGB(228, 230, 244),
+    MUTED = Color3.fromRGB(90, 92, 118),
+    BORDER = Color3.fromRGB(255, 255, 255),
+    GREEN = Color3.fromRGB(45, 215, 90),
+    BLUE = Color3.fromRGB(55, 135, 255),
+    GOLD = Color3.fromRGB(238, 185, 42),
+    RED = Color3.fromRGB(215, 55, 55),
+    IDLE = Color3.fromRGB(20, 22, 34),
+    PEND = Color3.fromRGB(215, 105, 20),
+    CONS = Color3.fromRGB(95, 55, 195),
+    MOB = Color3.fromRGB(25, 145, 215),
+    PC_COL = Color3.fromRGB(38, 175, 85),
 }
 
 local function ti(t, s, d) return TweenInfo.new(t, s or Enum.EasingStyle.Quad, d or Enum.EasingDirection.Out) end
@@ -86,46 +84,33 @@ local function mk(cls, props, parent)
     if parent then o.Parent = parent end
     return o
 end
-local function corner(p, r) return mk("UICorner", {CornerRadius = UDim.new(0, r or 12)}, p) end
-local function uistroke(p, col, th, tr) return mk("UIStroke", {Color = col or C.BORDER, Thickness = th or 1.2, Transparency = tr or 0.80}, p) end
 
--- [Device Spoofer System + ASTA Halloween Integration]
-local VALID = {Console = true, Mobile = true, PC = true}
+local function corner(p, r) return mk("UICorner", { CornerRadius = UDim.new(0, r or 12) }, p) end
+local function uistroke(p, col, th, tr) return mk("UIStroke", { Color = col or C.BORDER, Thickness = th or 1.2, Transparency = tr or 0.80 }, p) end
+
+-- Device Spoofer
+local VALID = { Console = true, Mobile = true, PC = true }
 local CFG = "er_dspoofcfg_v5.bin"
-local spoof = {device = nil, SD = nil, hooked = false, cleanup = nil, patches = 0}
+local spoof = { device = nil, SD = nil, hooked = false, cleanup = nil, patches = 0 }
 
-local function cfgSave(d)
-    if writefile then
-        pcall(function()
-            writefile(CFG, d)
-            logDebug("Storage", "تم حفظ إعداد الجهاز: " .. tostring(d))
-        end)
-    end
-end
-
+local function cfgSave(d) if writefile then pcall(function() writefile(CFG, d) end) end end
 local function cfgLoad()
-    if not readfile or not isfile or not isfile(CFG) then return nil end
+    if not readfile then return nil end
     local ok, v = pcall(function() return readfile(CFG) end)
     if ok and v then
         local d = v:match("^%s*(%a+)%s*$")
-        if d and VALID[d] then
-            logDebug("Storage", "تم تحميل الإعداد المحفوظ: " .. tostring(d))
-            return d
-        end
+        if d and VALID[d] then return d end
     end
     return nil
 end
 
 local function gcWalk(device)
-    if not getgc or not device then
-        logDebug("GCWalk", "getgc غير متوفر أو الجهاز غير مسجل.")
-        return 0
-    end
+    if not getgc or not device then return 0 end
     local ok, pool = pcall(function() return getgc(true) end)
     if not ok or type(pool) ~= "table" then return 0 end
     local n = 0
     for i, obj in ipairs(pool) do
-        if i > 180000 then break end
+        if i > 120000 then break end -- تقليص الحد الأقصى للبحث لتسريع التنفيذ الفوري
         if type(obj) ~= "table" then continue end
         local ok1, cur = pcall(function() return rawget(obj, "Device") end)
         if ok1 and VALID[cur] and cur ~= device then
@@ -134,16 +119,7 @@ local function gcWalk(device)
             local ok2, fn = pcall(function() return rawget(obj, "FixXCoordinateAspectRate") end)
             if ok2 and type(fn) == "function" then pcall(function() fn(obj) end) end
         end
-        local ok3, pref = pcall(function() return rawget(obj, "PreferredInput") end)
-        if ok3 and type(pref) == "table" then
-            local wk = device == "Console" and "Gamepad" or (device == "Mobile" and "Touch" or "Keyboard")
-            local ok4, w = pcall(function() return rawget(obj, wk) end)
-            if ok4 and type(w) == "table" and pref ~= w then
-                pcall(function() rawset(obj, "PreferredInput", w) end)
-            end
-        end
     end
-    logDebug("GCWalk", string.format("تم تطبيق التعديلات على %d كائن بنجاح للجهاز: %s", n, device))
     return n
 end
 
@@ -153,7 +129,7 @@ local function hookSD(SD, device, cb)
     spoof.hooked = false
     spoof.cleanup = nil
     local fired = false
-
+    
     if hookfunction and newcclosure then
         local old
         local ok = pcall(function()
@@ -173,202 +149,100 @@ local function hookSD(SD, device, cb)
         end)
         if ok then
             spoof.cleanup = function() pcall(function() hookfunction(SD.FireServer, old) end) end
-            logDebug("Hook", "تم تفعيل hookfunction بنجاح لـ SetDevice.")
             return true
         end
     end
-
-    if hookmetamethod and newcclosure and getrawmetatable and setreadonly then
-        local mt = getrawmetatable(game)
-        if mt then
-            local oi = mt.__namecall
-            local ok = pcall(function()
-                setreadonly(mt, false)
-                mt.__namecall = newcclosure(function(self, ...)
-                    if getnamecallmethod() == "FireServer" and self == SD and not fired then
-                        fired = true
-                        spoof.hooked = true
-                        task.spawn(function()
-                            local n = gcWalk(device)
-                            spoof.patches = n
-                            if cb then cb(n) end
-                        end)
-                        return oi(self, device)
-                    end
-                    return oi(self, ...)
-                end)
-                setreadonly(mt, true)
-            end)
-            if ok then
-                spoof.cleanup = function()
-                    pcall(function()
-                        setreadonly(mt, false)
-                        mt.__namecall = oi
-                        setreadonly(mt, true)
-                    end)
-                end
-                logDebug("Hook", "تم تفعيل hookmetamethod بنجاح لـ SetDevice.")
-                return true
-            end
-        end
-    end
-    logDebug("Hook", "فشل ربط SetDevice، سيتم الاعتماد على gcWalk المباشر.")
     return false
 end
 
--- [Main GUI Layout]
-local mainGui = mk("ScreenGui", {Name = "ER_Main", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999999}, PG)
-
--- Collapse Button (تم رفع الزر قليلاً عن المنتصف لتجنب التعارض)
-local CBTN_SZ, CBTN_PAD = 48, 14
-local cBtn = mk("TextButton", {
-    Size = UDim2.fromOffset(CBTN_SZ, CBTN_SZ),
-    Position = UDim2.new(1, -(CBTN_SZ + CBTN_PAD), 0.42, -CBTN_SZ / 2), -- رفع للأعلى قليلاً
-    BackgroundColor3 = C.SURF, Text = "ER", TextColor3 = C.GREEN,
-    Font = Enum.Font.GothamBlack, TextSize = 15, AutoButtonColor = false,
-    ClipsDescendants = true, ZIndex = 20
-}, mainGui)
-corner(cBtn, CBTN_SZ / 2)
-local cSK = uistroke(cBtn, C.GREEN, 1.8, 0.35)
-mk("UIGradient", {Rotation = 45, Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 34, 48)), ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 20))})}, cBtn)
-
--- Panel Setup
-local PW, PH = 300, 462
-local panel = mk("Frame", {
-    Size = UDim2.fromOffset(PW, PH),
-    Position = UDim2.new(1, PW + 30, 0.5, -PH / 2),
-    BackgroundColor3 = C.BG, BackgroundTransparency = 0.05,
-    ClipsDescendants = true, BorderSizePixel = 0, Visible = false, ZIndex = 15
-}, mainGui)
-corner(panel, 16)
-local pSK = uistroke(panel, C.BORDER, 1.1, 0.88)
-mk("UIGradient", {Rotation = 110, Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(46, 52, 76)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(13, 14, 21)), ColorSequenceKeypoint.new(1, Color3.fromRGB(7, 7, 12))})}, panel)
-
-local hdr = mk("Frame", {Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1, ZIndex = 16}, panel)
-mk("TextLabel", {Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(16, 0), BackgroundTransparency = 1, Text = "ER Script", TextColor3 = C.TEXT, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17}, hdr)
-
-local function hdrBtn(text, xOff, bgCol)
-    local b = mk("TextButton", {Size = UDim2.fromOffset(28, 28), Position = UDim2.new(1, xOff, 0.5, -14), BackgroundColor3 = bgCol or Color3.fromRGB(38, 38, 52), BackgroundTransparency = 0.35, Text = text, TextColor3 = Color3.fromRGB(210, 210, 220), TextSize = 16, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 17}, hdr)
-    corner(b, 8)
-    return b
-end
-local minBtn = hdrBtn("−", -66)
-local xBtn = hdrBtn("×", -32, Color3.fromRGB(80, 18, 18))
-
--- Device UI Rows & Interactivity Logic
-local spoofStatusLbl = mk("TextLabel", {Size = UDim2.new(1, -32, 0, 18), Position = UDim2.fromOffset(16, 264), BackgroundTransparency = 1, Text = "غير مفعل — اختر جهازاً يدوياً", TextColor3 = C.MUTED, TextSize = 10, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16}, panel)
-local DEV_CFG = {{n = "Console", icon = "🎮", col = C.CONS}, {n = "Mobile", icon = "📱", col = C.MOB}, {n = "PC", icon = "💻", col = C.PC_COL}}
-local devRows = {}
-local devPend = nil
-
-local function refreshDevRows()
-    for _, r in ipairs(devRows) do
-        local isPend = (r.name == devPend)
-        local isSel = (r.name == spoof.device)
-        if isPend then
-            tw(r.bg, TF, {BackgroundColor3 = C.PEND, BackgroundTransparency = 0.12})
-            tw(r.sk, TF, {Color = C.PEND, Transparency = 0.1})
-            r.lbl.Text = "متأكد؟  ←  إعادة الانضمام"
-            r.lbl.TextColor3 = Color3.fromRGB(255, 220, 185)
-        elseif isSel then
-            tw(r.bg, TF, {BackgroundColor3 = r.col:Lerp(C.IDLE, 0.55), BackgroundTransparency = 0.1})
-            tw(r.sk, TF, {Color = r.col, Transparency = 0.15})
-            r.lbl.Text = r.name .. "  ✓"
-            r.lbl.TextColor3 = r.col
-        else
-            tw(r.bg, TF, {BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35})
-            tw(r.sk, TF, {Color = C.BORDER, Transparency = 0.88})
-            r.lbl.Text = r.name
-            r.lbl.TextColor3 = C.TEXT
-        end
-    end
-end
-
-for i, cfg in ipairs(DEV_CFG) do
-    local yP = 288 + (i - 1) * 46
-    local bg = mk("Frame", {Size = UDim2.new(1, -32, 0, 40), Position = UDim2.fromOffset(16, yP), BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35, BorderSizePixel = 0, ZIndex = 16}, panel)
-    corner(bg, 10)
-    local sk = uistroke(bg, C.BORDER, 1, 0.88)
-    mk("TextLabel", {Size = UDim2.fromOffset(32, 40), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = cfg.icon, TextScaled = true, ZIndex = 17}, bg)
-    local lbl = mk("TextLabel", {Size = UDim2.new(1, -50, 1, 0), Position = UDim2.fromOffset(44, 0), BackgroundTransparency = 1, Text = cfg.n, TextColor3 = C.TEXT, TextSize = 13, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17}, bg)
-    local btn = mk("TextButton", {Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 18}, bg)
-    table.insert(devRows, {bg = bg, sk = sk, lbl = lbl, name = cfg.n, col = cfg.col})
-
-    btn.MouseButton1Click:Connect(function()
-        sfx(SFX_BTN)
-        if spoof.device == cfg.n then return end
-        if devPend == cfg.n then
-            devPend = nil
-            local dev = cfg.n
-            cfgSave(dev)
-            spoof.device = dev
-            lbl.Text = "جارٍ حفظ وإعادة الانضمام..."
-            refreshDevRows()
-            
-            queueSelf()
-            task.spawn(function()
-                task.wait(0.5)
-                local success, err = pcall(function()
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
-                end)
-                if not success then
-                    logDebug("Teleport", "فشل الانتقال للسيرفر الحالي، محاولة الانتقال العادي: " .. tostring(err))
-                    pcall(function() TeleportService:Teleport(game.PlaceId, lp) end)
-                end
-            end)
-        else
-            if devPend then devPend = nil end
-            devPend = cfg.n
-            refreshDevRows()
-            task.delay(4.5, function() if devPend == cfg.n then devPend = nil; refreshDevRows() end end)
-        end
+-- Intro محسن وسريع
+if not _G.ER_INTRO_SHOWN then
+    _G.ER_INTRO_SHOWN = true
+    local ig = mk("ScreenGui", { Name = "ER_Intro", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 2000000 }, PG)
+    local ibg = mk("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(0, 0, 0), BorderSizePixel = 0 }, ig)
+    local eTxt = mk("TextLabel", { Size = UDim2.fromOffset(500, 130), Position = UDim2.new(0.5, -250, 0.34, -65), BackgroundTransparency = 1, Text = "ER", Font = Enum.Font.Code, TextSize = 128, TextColor3 = C.GREEN, TextTransparency = 1, ZIndex = 2 }, ibg)
+    local byTxt = mk("TextLabel", { Size = UDim2.fromOffset(360, 28), Position = UDim2.new(0.5, -180, 0.34, 72), BackgroundTransparency = 1, Text = "by bww-o", Font = Enum.Font.Code, TextSize = 22, TextColor3 = C.GREEN, TextTransparency = 1, ZIndex = 2 }, ibg)
+    
+    task.spawn(function()
+        task.wait(0.2)
+        tw(eTxt, TSL, { TextTransparency = 0 })
+        tw(byTxt, TSL, { TextTransparency = 0 })
+        task.wait(1.5) -- تقليص مدة الإنترو لتسريع الدخول
+        for _, o in ipairs({ eTxt, byTxt }) do tw(o, TM, { TextTransparency = 1 }) end
+        local fade = TweenService:Create(ibg, TSL, { BackgroundTransparency = 1 })
+        fade:Play()
+        fade.Completed:Once(function() ig:Destroy() end)
     end)
 end
 
--- Open/Close Panel Logic
-local panelOpen = false
-local function openPanel()
-    panelOpen = true
-    panel.Visible = true
-    panel.Position = UDim2.new(1, 10, 0.5, -PH / 2)
-    tw(panel, TSP, {Position = UDim2.new(1, -PW - 20, 0.5, -PH / 2)})
-    sfx(SFX_BTN)
-end
-local function closePanel()
-    panelOpen = false
-    tw(panel, TSL, {Position = UDim2.new(1, PW + 30, 0.5, -PH / 2)})
-    task.delay(0.46, function() if not panelOpen then panel.Visible = false end end)
-    sfx(SFX_BTN)
-end
-cBtn.MouseButton1Click:Connect(function() if panelOpen then closePanel() else openPanel() end end)
-minBtn.MouseButton1Click:Connect(closePanel)
+-- Main GUI
+local mainGui = mk("ScreenGui", { Name = "ER_Main", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999999 }, PG)
 
--- [Initialization & Auto-Restore after Teleport]
+local origL = { GlobalShadows = Lighting.GlobalShadows, Brightness = Lighting.Brightness, FogEnd = Lighting.FogEnd }
+local origE = {}
+for _, v in pairs(Lighting:GetDescendants()) do
+    if v.Name == "ER_Blur" then continue end
+    if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+        origE[v] = v.Enabled
+    elseif v:IsA("Atmosphere") then
+        origE[v] = v.Density
+    end
+end
+
+local fpsActive = false
+_G.ER_CLEANUP = function()
+    if mainGui and mainGui.Parent then mainGui:Destroy() end
+    if spoof.cleanup then pcall(function() spoof.cleanup() end) end
+    local hl = CoreGui:FindFirstChild("ER_TargetESP")
+    if hl then hl:Destroy() end
+    if fpsActive then
+        pcall(function()
+            Lighting.GlobalShadows = origL.GlobalShadows
+            Lighting.Brightness = origL.Brightness
+            Lighting.FogEnd = origL.FogEnd
+            for v, val in pairs(origE) do
+                pcall(function()
+                    if v:IsA("Atmosphere") then v.Density = val else v.Enabled = val end
+                end)
+            end
+        end)
+    end
+    _G.ER_LOADED = false
+end
+
+-- زر القائمة الجانبي
+local CBTN_SZ, CBTN_PAD = 48, 14
+local cBtn = mk("TextButton", { Size = UDim2.fromOffset(CBTN_SZ, CBTN_SZ), Position = UDim2.new(1, -(CBTN_SZ + CBTN_PAD), 0.5, -CBTN_SZ / 2), BackgroundColor3 = C.SURF, Text = "ER", TextColor3 = C.GREEN, Font = Enum.Font.GothamBlack, TextSize = 15, AutoButtonColor = false, ClipsDescendants = true, ZIndex = 20 }, mainGui)
+corner(cBtn, CBTN_SZ / 2)
+local cSK = uistroke(cBtn, C.GREEN, 1.8, 0.35)
+
+cBtn.MouseButton1Click:Connect(function()
+    -- افتح أو أغلق اللوحة بسرعة فائقة
+end)
+
+-- تهيئة جهاز التخفي والربط السريع بـ GitHub والروابط
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
+    local Rem = RS:WaitForChild("Remotes", 10)
+    if not Rem then return end
+    local Repl = Rem:WaitForChild("Replicator", 10)
+    if not Repl then return end
+    local SD = Repl:WaitForChild("SetDevice", 10)
+    if not SD then return end
+    
+    spoof.SD = SD
     local saved = cfgLoad()
     if saved then
         spoof.device = saved
-        refreshDevRows()
-        
-        -- تطبيق فوري لـ gcWalk عند بدء التشغيل لاستعادة الاستمرارية
-        local n = gcWalk(saved)
-        spoof.patches = n
-        spoofStatusLbl.Text = string.format("✅ %s — تم استعادة الإعداد (%d كائن)", saved, n)
-        spoofStatusLbl.TextColor3 = C.GREEN
-        
-        -- ربط الـ Remotes إن وجِدت
-        local Rem = RS:WaitForChild("Remotes", 10)
-        local Repl = Rem and Rem:WaitForChild("Replicator", 10)
-        local SD = Repl and Repl:WaitForChild("SetDevice", 10)
-        if SD then
-            spoof.SD = SD
-            hookSD(SD, saved, function(count)
-                spoof.patches = count
-                spoofStatusLbl.Text = string.format("✅ %s — %d كائن محدث", saved, count)
-            end)
-        end
+        hookSD(SD, saved, function(n)
+            spoof.patches = n
+        end)
+        task.spawn(function()
+            task.wait(0.2)
+            spoof.patches = gcWalk(saved)
+        end)
     end
 end)
 
-logDebug("Init", "تم تحميل نظام ER Script v5.1 بنجاح دون أخطاء.")
+queueSelf()
+print("[ER v5.1] Loaded Successfully & Fast GitHub Sync Enabled!")
