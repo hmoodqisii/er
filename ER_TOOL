@@ -1,762 +1,470 @@
 --[[
 ╔══════════════════════════════════════════════════════════╗
-║              ER Script v5.2  —  by bww-o                 ║
-║  Lock-On · WallHop · FPS · Device Spoofer (Fixed & Fast) ║
+║              ER Script v5.4  —  by bww-o                   ║
+║  Lock-On · WallHop · FPS · Device Spoofer (Fixed)        ║
 ╚══════════════════════════════════════════════════════════╝
 loadstring(game:HttpGet("https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"))()
 ]]
-
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local Lighting = game:GetService("Lighting")
-local TeleportService = game:GetService("TeleportService")
-local RS = game:GetService("ReplicatedStorage")
-local SS = game:GetService("SoundService")
-local Debris = game:GetService("Debris")
-
-local lp = Players.LocalPlayer
-local PG = lp:WaitForChild("PlayerGui")
-local CAM = workspace.CurrentCamera
-local SCRIPT_URL = "https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"
-
--- تسريع الاتصال وحفظ السكربت بـ GitHub بشكل فوري عند الانتقال
+local Players=game:GetService("Players")
+local TweenService=game:GetService("TweenService")
+local RunService=game:GetService("RunService")
+local UIS=game:GetService("UserInputService")
+local CoreGui=game:GetService("CoreGui")
+local Lighting=game:GetService("Lighting")
+local TeleportService=game:GetService("TeleportService")
+local RS=game:GetService("ReplicatedStorage")
+local SS=game:GetService("SoundService")
+local Debris=game:GetService("Debris")
+local lp=Players.LocalPlayer
+local PG=lp:WaitForChild("PlayerGui")
+local CAM=workspace.CurrentCamera
+local SCRIPT_URL="https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"
 local function queueSelf()
     if not queue_on_teleport then return end
-    local code = string.format([[
+    local code=string.format([[
 if not game:IsLoaded() then game.Loaded:Wait() end
-task.wait(0.5)
-local ok, err = pcall(function() loadstring(game:HttpGet("%s", true))() end)
+task.wait(1.5)
+local ok,err=pcall(function() loadstring(game:HttpGet("%s"))() end)
 if not ok then warn("[ER] "..tostring(err)) end
-]], SCRIPT_URL)
+]],SCRIPT_URL)
     pcall(function() queue_on_teleport(code) end)
 end
-
 -- منع التشغيل المزدوج
 if _G.ER_LOADED then
     if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end
 end
-_G.ER_LOADED = true
-
+_G.ER_LOADED=true
 local function sfx(id)
-    local s = Instance.new("Sound")
-    s.SoundId = "rbxassetid://" .. tostring(id)
-    s.Volume = 0.55
-    s.Parent = SS
-    s:Play()
-    Debris:AddItem(s, 5)
+    local s=Instance.new("Sound"); s.SoundId="rbxassetid://"..tostring(id); s.Volume=0.55; s.Parent=SS; s:Play(); Debris:AddItem(s,5)
 end
-
-local SFX_DETACH = 12221944
-local SFX_BTN = 12221967
-
-local C = {
-    BG = Color3.fromRGB(9, 9, 14),
-    SURF = Color3.fromRGB(16, 17, 26),
-    TEXT = Color3.fromRGB(228, 230, 244),
-    MUTED = Color3.fromRGB(90, 92, 118),
-    BORDER = Color3.fromRGB(255, 255, 255),
-    GREEN = Color3.fromRGB(45, 215, 90),
-    BLUE = Color3.fromRGB(55, 135, 255),
-    GOLD = Color3.fromRGB(238, 185, 42),
-    RED = Color3.fromRGB(215, 55, 55),
-    IDLE = Color3.fromRGB(20, 22, 34),
-    PEND = Color3.fromRGB(215, 105, 20),
-    CONS = Color3.fromRGB(95, 55, 195),
-    MOB = Color3.fromRGB(25, 145, 215),
-    PC_COL = Color3.fromRGB(38, 175, 85),
+local SFX_DETACH=12221944; local SFX_BTN=12221967
+local C={
+    BG=Color3.fromRGB(9,9,14),SURF=Color3.fromRGB(16,17,26),TEXT=Color3.fromRGB(228,230,244),
+    MUTED=Color3.fromRGB(90,92,118),BORDER=Color3.fromRGB(255,255,255),GREEN=Color3.fromRGB(45,215,90),
+    BLUE=Color3.fromRGB(55,135,255),GOLD=Color3.fromRGB(238,185,42),RED=Color3.fromRGB(215,55,55),
+    IDLE=Color3.fromRGB(20,22,34),PEND=Color3.fromRGB(215,105,20),
+    CONS=Color3.fromRGB(95,55,195),MOB=Color3.fromRGB(25,145,215),PC_COL=Color3.fromRGB(38,175,85),
 }
-
-local function ti(t, s, d) return TweenInfo.new(t, s or Enum.EasingStyle.Quad, d or Enum.EasingDirection.Out) end
-local TF = ti(0.15)
-local TM = ti(0.26)
-local TSP = ti(0.36, Enum.EasingStyle.Back)
-local TSL = ti(0.44)
-
-local function tw(o, i, p) TweenService:Create(o, i, p):Play() end
-local function mk(cls, props, parent)
-    local o = Instance.new(cls)
-    for k, v in pairs(props) do o[k] = v end
-    if parent then o.Parent = parent end
-    return o
+local function ti(t,s,d) return TweenInfo.new(t,s or Enum.EasingStyle.Quad,d or Enum.EasingDirection.Out) end
+local TF=ti(0.15); local TM=ti(0.26); local TSP=ti(0.36,Enum.EasingStyle.Back); local TSL=ti(0.44)
+local function tw(o,i,p) TweenService:Create(o,i,p):Play() end
+local function mk(cls,props,parent)
+    local o=Instance.new(cls); for k,v in pairs(props) do o[k]=v end; if parent then o.Parent=parent end; return o
 end
+local function corner(p,r) return mk("UICorner",{CornerRadius=UDim.new(0,r or 12)},p) end
+local function uistroke(p,col,th,tr) return mk("UIStroke",{Color=col or C.BORDER,Thickness=th or 1.2,Transparency=tr or 0.80},p) end
 
-local function corner(p, r) return mk("UICorner", { CornerRadius = UDim.new(0, r or 12) }, p) end
-local function uistroke(p, col, th, tr) return mk("UIStroke", { Color = col or C.BORDER, Thickness = th or 1.2, Transparency = tr or 0.80 }, p) end
-
--- Device Spoofer
-local VALID = { Console = true, Mobile = true, PC = true }
-local CFG = "er_dspoofcfg_v5.bin"
-local spoof = { device = nil, SD = nil, hooked = false, cleanup = nil, patches = 0 }
-
-local function cfgSave(d) if writefile then pcall(function() writefile(CFG, d) end) end end
+-- Device Spoofer (تم تعديله ليتوافق مع الـ UIController الداخلي للعبة)
+local VALID={Console=true,Mobile=true,PC=true}
+local CFG="er_dspoofcfg_v5.bin"
+local spoof={device=nil,SD=nil,hooked=false,cleanup=nil,patches=0}
+local function cfgSave(d) if writefile then pcall(function() writefile(CFG,d) end) end end
 local function cfgLoad()
     if not readfile then return nil end
-    local ok, v = pcall(function() return readfile(CFG) end)
-    if ok and v then
-        local d = v:match("^%s*(%a+)%s*$")
-        if d and VALID[d] then return d end
-    end
+    local ok,v=pcall(function() return readfile(CFG) end)
+    if ok and v then local d=v:match("^%s*(%a+)%s*$"); if d and VALID[d] then return d end end
     return nil
 end
 
 local function gcWalk(device)
     if not getgc or not device then return 0 end
-    local ok, pool = pcall(function() return getgc(true) end)
-    if not ok or type(pool) ~= "table" then return 0 end
-    local n = 0
-    for i, obj in ipairs(pool) do
-        if i > 150000 then break end
-        if type(obj) ~= "table" then continue end
-        local ok1, cur = pcall(function() return rawget(obj, "Device") end)
-        if ok1 and VALID[cur] and cur ~= device then
-            pcall(function() rawset(obj, "Device", device) end)
-            n += 1
-            local ok2, fn = pcall(function() return rawget(obj, "FixXCoordinateAspectRate") end)
-            if ok2 and type(fn) == "function" then pcall(function() fn(obj) end) end
+    local ok,pool=pcall(function() return getgc(true) end)
+    if not ok or type(pool)~="table" then return 0 end
+    local n=0
+    for i,obj in ipairs(pool) do
+        if i>180000 then break end
+        if type(obj)~="table" then continue end
+        
+        -- التعديل الجذري لتحديث متغير Device الخاص بواجهة اللعبة (UIController)
+        local ok1,cur=pcall(function() return rawget(obj,"Device") end)
+        if ok1 and (cur=="PC" or cur=="Mobile" or cur=="Console") then
+            pcall(function() rawset(obj,"Device",device) end); n+=1
         end
-        local ok3, pref = pcall(function() return rawget(obj, "PreferredInput") end)
-        if ok3 and type(pref) == "table" then
-            local wk = device == "Console" and "Gamepad" or (device == "Mobile" and "Touch" or "Keyboard")
-            local ok4, w = pcall(function() return rawget(obj, wk) end)
-            if ok4 and type(w) == "table" and pref ~= w then
-                pcall(function() rawset(obj, "PreferredInput", w) end)
-            end
+        
+        local ok_obj,cur_obj=pcall(function() return rawget(obj,"device") end)
+        if ok_obj and VALID[cur_obj] and cur_obj~=device then
+            pcall(function() rawset(obj,"device",device) end); n+=1
         end
     end
     return n
 end
 
-local function hookSD(SD, device, cb)
+local function hookSD(SD,device,cb)
     if spoof.cleanup then pcall(function() spoof.cleanup() end) end
-    spoof.SD = SD
-    spoof.hooked = false
-    spoof.cleanup = nil
-    local fired = false
-    
+    spoof.SD=SD; spoof.hooked=false; spoof.cleanup=nil; local fired=false
     if hookfunction and newcclosure then
-        local old
-        local ok = pcall(function()
-            old = hookfunction(SD.FireServer, newcclosure(function(self, ...)
-                if self == SD and not fired then
-                    fired = true
-                    spoof.hooked = true
-                    task.spawn(function()
-                        local n = gcWalk(device)
-                        spoof.patches = n
-                        if cb then cb(n) end
-                    end)
-                    return old(self, device)
-                end
-                return old(self, ...)
+        local old; local ok=pcall(function()
+            old=hookfunction(SD.FireServer,newcclosure(function(self,...)
+                if self==SD and not fired then
+                    fired=true; spoof.hooked=true
+                    task.spawn(function() local n=gcWalk(device); spoof.patches=n; if cb then cb(n) end end)
+                    return old(self,device)
+                end; return old(self,...)
             end))
         end)
-        if ok then
-            spoof.cleanup = function() pcall(function() hookfunction(SD.FireServer, old) end) end
-            return true
-        end
+        if ok then spoof.cleanup=function() pcall(function() hookfunction(SD.FireServer,old) end) end; return true end
     end
-    
     if hookmetamethod and newcclosure then
-        local mt = getrawmetatable(game)
-        if not mt then return false end
-        local oi = mt.__namecall
-        local ok = pcall(function()
-            setreadonly(mt, false)
-            mt.__namecall = newcclosure(function(self, ...)
-                if getnamecallmethod() == "FireServer" and self == SD and not fired then
-                    fired = true
-                    spoof.hooked = true
-                    task.spawn(function()
-                        local n = gcWalk(device)
-                        spoof.patches = n
-                        if cb then cb(n) end
-                    end)
-                    return oi(self, device)
-                end
-                return oi(self, ...)
-            end)
-            setreadonly(mt, true)
+        local mt=getrawmetatable(game); if not mt then return false end; local oi=mt.__namecall
+        local ok=pcall(function()
+            setreadonly(mt,false)
+            mt.__namecall=newcclosure(function(self,...)
+                if getnamecallmethod()=="FireServer" and self==SD and not fired then
+                    fired=true; spoof.hooked=true
+                    task.spawn(function() local n=gcWalk(device); spoof.patches=n; if cb then cb(n) end end)
+                    return oi(self,device)
+                end; return oi(self,...)
+            end); setreadonly(mt,true)
         end)
-        if ok then
-            spoof.cleanup = function() pcall(function() setreadonly(mt, false); mt.__namecall = oi; setreadonly(mt, true) end) end
-            return true
-        end
+        if ok then spoof.cleanup=function() pcall(function() setreadonly(mt,false); mt.__namecall=oi; setreadonly(mt,true) end) end; return true end
     end
     return false
 end
 
--- Intro سريع
+-- Intro
 if not _G.ER_INTRO_SHOWN then
-    _G.ER_INTRO_SHOWN = true
-    local ig = mk("ScreenGui", { Name = "ER_Intro", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 2000000 }, PG)
-    local ibg = mk("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(0, 0, 0), BorderSizePixel = 0 }, ig)
-    local eTxt = mk("TextLabel", { Size = UDim2.fromOffset(500, 130), Position = UDim2.new(0.5, -250, 0.34, -65), BackgroundTransparency = 1, Text = "ER", Font = Enum.Font.Code, TextSize = 128, TextColor3 = C.GREEN, TextTransparency = 1, ZIndex = 2 }, ibg)
-    local eGrad = mk("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 230, 100)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 255, 190)), ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 230, 100)) }), Rotation = 50, Offset = Vector2.new(-1, 0) }, eTxt)
-    local byTxt = mk("TextLabel", { Size = UDim2.fromOffset(360, 28), Position = UDim2.new(0.5, -180, 0.34, 72), BackgroundTransparency = 1, Text = "by bww-o", Font = Enum.Font.Code, TextSize = 22, TextColor3 = C.GREEN, TextTransparency = 1, ZIndex = 2 }, ibg)
-    local mLbl = mk("TextLabel", { Size = UDim2.fromOffset(680, 36), Position = UDim2.new(0.5, -340, 0.63, 0), BackgroundTransparency = 1, Font = Enum.Font.Code, TextSize = 18, TextColor3 = Color3.fromRGB(40, 210, 80), ZIndex = 2 }, ibg)
-    local mGrad = mk("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)), ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0)) }), Offset = Vector2.new(1, 0) }, mLbl)
-    local cTxt = mk("TextLabel", { Size = UDim2.fromOffset(360, 18), Position = UDim2.new(0, 18, 1, -44), BackgroundTransparency = 1, Text = "صنع من قبل bww-o  •  تيك توك: bww-o", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = Color3.fromRGB(55, 55, 70), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1 }, ibg)
-    
+    _G.ER_INTRO_SHOWN=true
+    local ig=mk("ScreenGui",{Name="ER_Intro",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=2000000},PG)
+    local ibg=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0},ig)
+    local eTxt=mk("TextLabel",{Size=UDim2.fromOffset(500,130),Position=UDim2.new(0.5,-250,0.34,-65),BackgroundTransparency=1,Text="ER",Font=Enum.Font.Code,TextSize=128,TextColor3=C.GREEN,TextTransparency=1,ZIndex=2},ibg)
+    local eGrad=mk("UIGradient",{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(50,230,100)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(180,255,190)),ColorSequenceKeypoint.new(1,Color3.fromRGB(50,230,100))}),Rotation=50,Offset=Vector2.new(-1,0)},eTxt)
+    local byTxt=mk("TextLabel",{Size=UDim2.fromOffset(360,28),Position=UDim2.new(0.5,-180,0.34,72),BackgroundTransparency=1,Text="by bww-o",Font=Enum.Font.Code,TextSize=22,TextColor3=C.GREEN,TextTransparency=1,ZIndex=2},ibg)
+    local mLbl=mk("TextLabel",{Size=UDim2.fromOffset(680,36),Position=UDim2.new(0.5,-340,0.63,0),BackgroundTransparency=1,Font=Enum.Font.Code,TextSize=18,TextColor3=Color3.fromRGB(40,210,80),ZIndex=2},ibg)
+    local mGrad=mk("UIGradient",{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.new(0,0,0)),ColorSequenceKeypoint.new(0.5,Color3.new(1,1,1)),ColorSequenceKeypoint.new(1,Color3.new(0,0,0))}),Offset=Vector2.new(1,0)},mLbl)
+    local cTxt=mk("TextLabel",{Size=UDim2.fromOffset(360,18),Position=UDim2.new(0,18,1,-44),BackgroundTransparency=1,Text="صنع من قبل bww-o  •  تيك توك: bww-o",Font=Enum.Font.Gotham,TextSize=12,TextColor3=Color3.fromRGB(55,55,70),TextXAlignment=Enum.TextXAlignment.Left,TextTransparency=1},ibg)
     task.spawn(function()
-        local ch = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "X", "E", "R", "$", "#", "@", "*", "&", "=", "?" }
-        local function gen() local t = {} for i = 1, 28 do t[i] = ch[math.random(1, #ch)] end return table.concat(t, " ") end
-        task.wait(0.2); tw(eTxt, TSL, { TextTransparency = 0 }); tw(byTxt, TSL, { TextTransparency = 0 }); tw(cTxt, TSL, { TextTransparency = 0 })
-        local gT = TweenService:Create(eGrad, ti(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Offset = Vector2.new(1, 0) })
-        gT.Completed:Connect(function() TweenService:Create(eGrad, ti(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Offset = Vector2.new(-1, 0) }):Play() end); gT:Play()
-        local matOn = true; task.spawn(function() while matOn do mLbl.Text = gen(); task.wait(0.05) end end)
-        local mS = TweenService:Create(mGrad, ti(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Offset = Vector2.new(-1, 0) })
-        mS.Completed:Connect(function() TweenService:Create(mGrad, ti(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Offset = Vector2.new(1, 0) }):Play() end); mS:Play()
-        task.wait(2.5) -- إنترو أسرع
-        matOn = false; gT:Cancel(); mS:Cancel()
-        for _, o in ipairs({ eTxt, byTxt, mLbl, cTxt }) do tw(o, TM, { TextTransparency = 1 }) end
-        local fade = TweenService:Create(ibg, TSL, { BackgroundTransparency = 1 }); fade:Play()
+        local ch={"0","1","2","3","4","5","6","7","8","9","X","E","R","$","#","@","*","&","=","?"}
+        local function gen() local t={} for i=1,28 do t[i]=ch[math.random(1,#ch)] end return table.concat(t," ") end
+        task.wait(0.4); tw(eTxt,TSL,{TextTransparency=0}); tw(byTxt,TSL,{TextTransparency=0}); tw(cTxt,TSL,{TextTransparency=0})
+        local gT=TweenService:Create(eGrad,ti(1.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Offset=Vector2.new(1,0)})
+        gT.Completed:Connect(function() TweenService:Create(eGrad,ti(1.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Offset=Vector2.new(-1,0)}):Play() end); gT:Play()
+        local matOn=true; task.spawn(function() while matOn do mLbl.Text=gen(); task.wait(0.065) end end)
+        local mS=TweenService:Create(mGrad,ti(1.9,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Offset=Vector2.new(-1,0)})
+        mS.Completed:Connect(function() TweenService:Create(mGrad,ti(1.9,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Offset=Vector2.new(1,0)}):Play() end); mS:Play()
+        task.wait(4.5); matOn=false; gT:Cancel(); mS:Cancel()
+        for _,o in ipairs({eTxt,byTxt,mLbl,cTxt}) do tw(o,TM,{TextTransparency=1}) end
+        local fade=TweenService:Create(ibg,TSL,{BackgroundTransparency=1}); fade:Play()
         fade.Completed:Once(function() ig:Destroy() end)
     end)
 end
 
 -- Main GUI
-local mainGui = mk("ScreenGui", { Name = "ER_Main", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999999 }, PG)
-
-local origL = { GlobalShadows = Lighting.GlobalShadows, Brightness = Lighting.Brightness, FogEnd = Lighting.FogEnd }
-local origE = {}
-for _, v in pairs(Lighting:GetDescendants()) do
-    if v.Name == "ER_Blur" then continue end
-    if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
-        origE[v] = v.Enabled
-    elseif v:IsA("Atmosphere") then
-        origE[v] = v.Density
-    end
+local mainGui=mk("ScreenGui",{Name="ER_Main",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=999999},PG)
+local origL={GlobalShadows=Lighting.GlobalShadows,Brightness=Lighting.Brightness,FogEnd=Lighting.FogEnd}
+local origE={}
+for _,v in pairs(Lighting:GetDescendants()) do
+    if v.Name=="ER_Blur" then continue end
+    if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then origE[v]=v.Enabled
+    elseif v:IsA("Atmosphere") then origE[v]=v.Density end
 end
-
-local fpsActive = false
-_G.ER_CLEANUP = function()
+local fpsActive=false
+_G.ER_CLEANUP=function()
     if mainGui and mainGui.Parent then mainGui:Destroy() end
     if spoof.cleanup then pcall(function() spoof.cleanup() end) end
-    local hl = CoreGui:FindFirstChild("ER_TargetESP")
-    if hl then hl:Destroy() end
+    local hl=CoreGui:FindFirstChild("ER_TargetESP"); if hl then hl:Destroy() end
     if fpsActive then
         pcall(function()
-            Lighting.GlobalShadows = origL.GlobalShadows
-            Lighting.Brightness = origL.Brightness
-            Lighting.FogEnd = origL.FogEnd
-            for v, val in pairs(origE) do
-                pcall(function() if v:IsA("Atmosphere") then v.Density = val else v.Enabled = val end end)
-            end
+            Lighting.GlobalShadows=origL.GlobalShadows; Lighting.Brightness=origL.Brightness; Lighting.FogEnd=origL.FogEnd
+            for v,val in pairs(origE) do pcall(function() if v:IsA("Atmosphere") then v.Density=val else v.Enabled=val end end) end
         end)
     end
-    _G.ER_LOADED = false
+    _G.ER_LOADED=false
 end
 
--- Collapse Button (الدائرة التي تفتح القائمة - تم إصلاحها بالكامل لتعمل فوراً)
-local CBTN_SZ, CBTN_PAD = 48, 14
-local cBtn = mk("TextButton", { Size = UDim2.fromOffset(CBTN_SZ, CBTN_SZ), Position = UDim2.new(1, -(CBTN_SZ + CBTN_PAD), 0.5, -CBTN_SZ / 2), BackgroundColor3 = C.SURF, Text = "ER", TextColor3 = C.GREEN, Font = Enum.Font.GothamBlack, TextSize = 15, AutoButtonColor = false, ClipsDescendants = true, ZIndex = 20 }, mainGui)
-corner(cBtn, CBTN_SZ / 2)
-local cSK = uistroke(cBtn, C.GREEN, 1.8, 0.35)
-mk("UIGradient", { Rotation = 45, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 34, 48)), ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 20)) }) }, cBtn)
+-- Collapse Button
+local CBTN_SZ,CBTN_PAD=48,14
+local cBtn=mk("TextButton",{Size=UDim2.fromOffset(CBTN_SZ,CBTN_SZ),Position=UDim2.new(1,-(CBTN_SZ+CBTN_PAD),0.5,-CBTN_SZ/2),BackgroundColor3=C.SURF,Text="ER",TextColor3=C.GREEN,Font=Enum.Font.GothamBlack,TextSize=15,AutoButtonColor=false,ClipsDescendants=true,ZIndex=20},mainGui)
+corner(cBtn,CBTN_SZ/2); local cSK=uistroke(cBtn,C.GREEN,1.8,0.35)
+mk("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(28,34,48)),ColorSequenceKeypoint.new(1,Color3.fromRGB(12,14,20))})},cBtn)
+task.spawn(function() while mainGui.Parent do tw(cSK,ti(1.2,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Transparency=0.1}); task.wait(1.2); tw(cSK,ti(1.2,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Transparency=0.55}); task.wait(1.2) end end)
+cBtn.MouseEnter:Connect(function() tw(cBtn,TF,{BackgroundColor3=Color3.fromRGB(24,30,42)}); tw(cSK,TF,{Thickness=2.2,Transparency=0}) end)
+cBtn.MouseLeave:Connect(function() tw(cBtn,TF,{BackgroundColor3=C.SURF}); tw(cSK,TF,{Thickness=1.8,Transparency=0.35}) end)
 
-task.spawn(function()
-    while mainGui.Parent do
-        tw(cSK, ti(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Transparency = 0.1 })
-        task.wait(1.2)
-        tw(cSK, ti(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Transparency = 0.55 })
-        task.wait(1.2)
-    end
-end)
-
-cBtn.MouseEnter:Connect(function() tw(cBtn, TF, { BackgroundColor3 = Color3.fromRGB(24, 30, 42) }); tw(cSK, TF, { Thickness = 2.2, Transparency = 0 }) end)
-cBtn.MouseLeave:Connect(function() tw(cBtn, TF, { BackgroundColor3 = C.SURF }); tw(cSK, TF, { Thickness = 1.8, Transparency = 0.35 }) end)
-
--- Panel (لوحة التحكم الرئيسية)
-local PW, PH = 300, 462
-local panel = mk("Frame", { Size = UDim2.fromOffset(PW, PH), Position = UDim2.new(1, PW + 30, 0.5, -PH / 2), BackgroundColor3 = C.BG, BackgroundTransparency = 0.05, ClipsDescendants = true, BorderSizePixel = 0, Visible = false, ZIndex = 15 }, mainGui)
-corner(panel, 16)
-local pSK = uistroke(panel, C.BORDER, 1.1, 0.88)
-mk("UIGradient", { Rotation = 110, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(46, 52, 76)), ColorSequenceKeypoint.new(0.4, Color3.fromRGB(13, 14, 21)), ColorSequenceKeypoint.new(1, Color3.fromRGB(7, 7, 12)) }), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.44), NumberSequenceKeypoint.new(0.4, 0.04), NumberSequenceKeypoint.new(1, 0) }) }, panel)
-
-local hdr = mk("Frame", { Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1, ZIndex = 16 }, panel)
-mk("TextLabel", { Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(16, 0), BackgroundTransparency = 1, Text = "ER  Script", TextColor3 = C.TEXT, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17 }, hdr)
-
-local function hdrBtn(text, xOff, bgCol)
-    local b = mk("TextButton", { Size = UDim2.fromOffset(28, 28), Position = UDim2.new(1, xOff, 0.5, -14), BackgroundColor3 = bgCol or Color3.fromRGB(38, 38, 52), BackgroundTransparency = 0.35, Text = text, TextColor3 = Color3.fromRGB(210, 210, 220), TextSize = 16, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 17 }, hdr)
-    corner(b, 8)
-    b.MouseEnter:Connect(function() tw(b, TF, { BackgroundTransparency = 0.05 }) end)
-    b.MouseLeave:Connect(function() tw(b, TF, { BackgroundTransparency = 0.35 }) end)
-    return b
+-- Panel
+local PW,PH=300,462
+local panel=mk("Frame",{Size=UDim2.fromOffset(PW,PH),Position=UDim2.new(1,PW+30,0.5,-PH/2),BackgroundColor3=C.BG,BackgroundTransparency=0.05,ClipsDescendants=true,BorderSizePixel=0,Visible=false,ZIndex=15},mainGui)
+corner(panel,16); local pSK=uistroke(panel,C.BORDER,1.1,0.88)
+mk("UIGradient",{Rotation=110,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(46,52,76)),ColorSequenceKeypoint.new(0.4,Color3.fromRGB(13,14,21)),ColorSequenceKeypoint.new(1,Color3.fromRGB(7,7,12))}),Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.44),NumberSequenceKeypoint.new(0.4,0.04),NumberSequenceKeypoint.new(1,0)})},panel)
+local hdr=mk("Frame",{Size=UDim2.new(1,0,0,50),BackgroundTransparency=1,ZIndex=16},panel)
+mk("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.fromOffset(16,0),BackgroundTransparency=1,Text="ER  Script",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},hdr)
+local function hdrBtn(text,xOff,bgCol)
+    local b=mk("TextButton",{Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,xOff,0.5,-14),BackgroundColor3=bgCol or Color3.fromRGB(38,38,52),BackgroundTransparency=0.35,Text=text,TextColor3=Color3.fromRGB(210,210,220),TextSize=16,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=17},hdr)
+    corner(b,8); b.MouseEnter:Connect(function() tw(b,TF,{BackgroundTransparency=0.05}) end); b.MouseLeave:Connect(function() tw(b,TF,{BackgroundTransparency=0.35}) end); return b
 end
-
-local minBtn = hdrBtn("−", -66)
-local xBtn = hdrBtn("×", -32, Color3.fromRGB(80, 18, 18))
-xBtn.TextColor3 = Color3.fromRGB(220, 155, 155)
-
-mk("Frame", { Size = UDim2.new(1, -32, 0, 1), Position = UDim2.fromOffset(16, 50), BackgroundColor3 = C.BORDER, BackgroundTransparency = 0.86, BorderSizePixel = 0, ZIndex = 16 }, panel)
+local minBtn=hdrBtn("−",-66); local xBtn=hdrBtn("×",-32,Color3.fromRGB(80,18,18)); xBtn.TextColor3=Color3.fromRGB(220,155,155)
+mk("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.fromOffset(16,50),BackgroundColor3=C.BORDER,BackgroundTransparency=0.86,BorderSizePixel=0,ZIndex=16},panel)
 
 -- FPS Button
-local fpsBtn = mk("TextButton", { Size = UDim2.new(1, -32, 0, 36), Position = UDim2.fromOffset(16, 58), BackgroundColor3 = Color3.fromRGB(30, 80, 34), BackgroundTransparency = 0.3, Text = "⚡  FPS Boost", TextColor3 = C.TEXT, TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 16 }, panel)
-corner(fpsBtn, 10)
-uistroke(fpsBtn, C.BORDER, 1, 0.88)
+local fpsBtn=mk("TextButton",{Size=UDim2.new(1,-32,0,36),Position=UDim2.fromOffset(16,58),BackgroundColor3=Color3.fromRGB(30,80,34),BackgroundTransparency=0.3,Text="⚡  FPS Boost",TextColor3=C.TEXT,TextSize=12,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=16},panel)
+corner(fpsBtn,10); uistroke(fpsBtn,C.BORDER,1,0.88)
 fpsBtn.MouseButton1Click:Connect(function()
     sfx(SFX_BTN)
     if not fpsActive then
-        fpsActive = true
-        Lighting.GlobalShadows = false
-        Lighting.Brightness = 2
-        Lighting.FogEnd = 9e9
-        for _, v in pairs(Lighting:GetDescendants()) do
-            if v.Name == "ER_Blur" then continue end
-            if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
-                v.Enabled = false
-            elseif v:IsA("Atmosphere") then
-                v.Density = 0
-            end
+        fpsActive=true; Lighting.GlobalShadows=false; Lighting.Brightness=2; Lighting.FogEnd=9e9
+        for _,v in pairs(Lighting:GetDescendants()) do
+            if v.Name=="ER_Blur" then continue end
+            if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then v.Enabled=false
+            elseif v:IsA("Atmosphere") then v.Density=0 end
         end
-        fpsBtn.Text = "⚡  Boosted ✅"
-        fpsBtn.BackgroundColor3 = Color3.fromRGB(28, 78, 32)
+        fpsBtn.Text="⚡  Boosted ✅"; fpsBtn.BackgroundColor3=Color3.fromRGB(28,78,32)
     else
-        fpsActive = false
-        Lighting.GlobalShadows = origL.GlobalShadows
-        Lighting.Brightness = origL.Brightness
-        Lighting.FogEnd = origL.FogEnd
-        for v, val in pairs(origE) do
-            pcall(function() if v:IsA("Atmosphere") then v.Density = val else v.Enabled = val end end)
-        end
-        fpsBtn.Text = "⚡  FPS Boost"
-        fpsBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 34)
+        fpsActive=false; Lighting.GlobalShadows=origL.GlobalShadows; Lighting.Brightness=origL.Brightness; Lighting.FogEnd=origL.FogEnd
+        for v,val in pairs(origE) do pcall(function() if v:IsA("Atmosphere") then v.Density=val else v.Enabled=val end end) end
+        fpsBtn.Text="⚡  FPS Boost"; fpsBtn.BackgroundColor3=Color3.fromRGB(30,80,34)
     end
 end)
 
--- Toggle Rows
-local function mkToggleRow(label, yPos, colorOn)
-    local bg = mk("Frame", { Size = UDim2.new(1, -32, 0, 44), Position = UDim2.fromOffset(16, yPos), BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 16 }, panel)
-    corner(bg, 11)
-    local sk = uistroke(bg, C.BORDER, 1, 0.88)
-    local lbl = mk("TextLabel", { Size = UDim2.new(1, -58, 1, 0), Position = UDim2.fromOffset(14, 0), BackgroundTransparency = 1, Text = label, TextColor3 = C.TEXT, TextSize = 13, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17 }, bg)
-    local pill = mk("Frame", { Size = UDim2.fromOffset(44, 24), Position = UDim2.new(1, -52, 0.5, -12), BackgroundColor3 = Color3.fromRGB(38, 38, 52), BorderSizePixel = 0, ZIndex = 17 }, bg)
-    corner(pill, 12)
-    local pillSK = uistroke(pill, C.MUTED, 1, 0.5)
-    local dot = mk("Frame", { Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(3, 3), BackgroundColor3 = C.MUTED, BorderSizePixel = 0, ZIndex = 18 }, pill)
-    corner(dot, 9)
-    local btn = mk("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 19 }, bg)
-    local on = false
+-- Toggle Row
+local function mkToggleRow(label,yPos,colorOn)
+    local bg=mk("Frame",{Size=UDim2.new(1,-32,0,44),Position=UDim2.fromOffset(16,yPos),BackgroundColor3=C.IDLE,BackgroundTransparency=0.3,BorderSizePixel=0,ZIndex=16},panel)
+    corner(bg,11); local sk=uistroke(bg,C.BORDER,1,0.88)
+    local lbl=mk("TextLabel",{Size=UDim2.new(1,-58,1,0),Position=UDim2.fromOffset(14,0),BackgroundTransparency=1,Text=label,TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},bg)
+    local pill=mk("Frame",{Size=UDim2.fromOffset(44,24),Position=UDim2.new(1,-52,0.5,-12),BackgroundColor3=Color3.fromRGB(38,38,52),BorderSizePixel=0,ZIndex=17},bg); corner(pill,12)
+    local pillSK=uistroke(pill,C.MUTED,1,0.5)
+    local dot=mk("Frame",{Size=UDim2.fromOffset(18,18),Position=UDim2.fromOffset(3,3),BackgroundColor3=C.MUTED,BorderSizePixel=0,ZIndex=18},pill); corner(dot,9)
+    local btn=mk("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=19},bg)
+    local on=false
     local function set(state)
-        on = state
+        on=state
         if on then
-            tw(bg, TSP, { BackgroundColor3 = colorOn:Lerp(C.IDLE, 0.6) })
-            tw(sk, TM, { Color = colorOn, Transparency = 0.18 })
-            tw(dot, TSP, { BackgroundColor3 = colorOn, Position = UDim2.fromOffset(23, 3) })
-            tw(pill, TM, { BackgroundColor3 = colorOn:Lerp(C.IDLE, 0.72) })
-            tw(pillSK, TM, { Color = colorOn, Transparency = 0.55 })
-            lbl.TextColor3 = colorOn
+            tw(bg,TSP,{BackgroundColor3=colorOn:Lerp(C.IDLE,0.6)}); tw(sk,TM,{Color=colorOn,Transparency=0.18})
+            tw(dot,TSP,{BackgroundColor3=colorOn,Position=UDim2.fromOffset(23,3)}); tw(pill,TM,{BackgroundColor3=colorOn:Lerp(C.IDLE,0.72)})
+            tw(pillSK,TM,{Color=colorOn,Transparency=0.55}); lbl.TextColor3=colorOn
         else
-            tw(bg, TM, { BackgroundColor3 = C.IDLE })
-            tw(sk, TM, { Color = C.BORDER, Transparency = 0.88 })
-            tw(dot, TSP, { BackgroundColor3 = C.MUTED, Position = UDim2.fromOffset(3, 3) })
-            tw(pill, TM, { BackgroundColor3 = Color3.fromRGB(38, 38, 52) })
-            tw(pillSK, TM, { Color = C.MUTED, Transparency = 0.5 })
-            lbl.TextColor3 = C.TEXT
+            tw(bg,TM,{BackgroundColor3=C.IDLE}); tw(sk,TM,{Color=C.BORDER,Transparency=0.88})
+            tw(dot,TSP,{BackgroundColor3=C.MUTED,Position=UDim2.fromOffset(3,3)}); tw(pill,TM,{BackgroundColor3=Color3.fromRGB(38,38,52)})
+            tw(pillSK,TM,{Color=C.MUTED,Transparency=0.5}); lbl.TextColor3=C.TEXT
         end
     end
     btn.MouseButton1Click:Connect(function() sfx(SFX_BTN); set(not on) end)
-    btn.MouseEnter:Connect(function() if not on then tw(bg, TF, { BackgroundColor3 = Color3.fromRGB(26, 28, 44), BackgroundTransparency = 0.18 }) end end)
-    btn.MouseLeave:Connect(function() if not on then tw(bg, TF, { BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.3 }) end end)
-    return set, function() return on end
+    btn.MouseEnter:Connect(function() if not on then tw(bg,TF,{BackgroundColor3=Color3.fromRGB(26,28,44),BackgroundTransparency=0.18}) end end)
+    btn.MouseLeave:Connect(function() if not on then tw(bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.3}) end end)
+    return set,function() return on end
 end
 
-mk("TextLabel", { Size = UDim2.new(1, -32, 0, 22), Position = UDim2.fromOffset(16, 106), BackgroundTransparency = 1, Text = "أدوات القتال", TextColor3 = C.MUTED, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16 }, panel)
-local setLock, lockOn = mkToggleRow("🎯  Lock-On", 130, C.GREEN)
-local setHop, hopOn = mkToggleRow("🧱  Wall Hop", 182, C.BLUE)
-
-mk("Frame", { Size = UDim2.new(1, -32, 0, 1), Position = UDim2.fromOffset(16, 236), BackgroundColor3 = C.BORDER, BackgroundTransparency = 0.9, BorderSizePixel = 0, ZIndex = 16 }, panel)
-mk("TextLabel", { Size = UDim2.new(1, -32, 0, 20), Position = UDim2.fromOffset(16, 242), BackgroundTransparency = 1, Text = "Device Spoofer", TextColor3 = C.MUTED, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16 }, panel)
-local spoofStatusLbl = mk("TextLabel", { Size = UDim2.new(1, -32, 0, 18), Position = UDim2.fromOffset(16, 264), BackgroundTransparency = 1, Text = "غير مفعل — اختر جهازاً يدوياً", TextColor3 = C.MUTED, TextSize = 10, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16 }, panel)
-
-local DEV_CFG = { { n = "Console", icon = "🎮", col = C.CONS }, { n = "Mobile", icon = "📱", col = C.MOB }, { n = "PC", icon = "💻", col = C.PC_COL } }
-local devRows = {}
-local devPend = nil
+mk("TextLabel",{Size=UDim2.new(1,-32,0,22),Position=UDim2.fromOffset(16,106),BackgroundTransparency=1,Text="أدوات القتال",TextColor3=C.MUTED,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+local setLock,lockOn=mkToggleRow("🎯  Lock-On",130,C.GREEN)
+local setHop,hopOn=mkToggleRow("🧱  Wall Hop",182,C.BLUE)
+mk("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.fromOffset(16,236),BackgroundColor3=C.BORDER,BackgroundTransparency=0.9,BorderSizePixel=0,ZIndex=16},panel)
+mk("TextLabel",{Size=UDim2.new(1,-32,0,20),Position=UDim2.fromOffset(16,242),BackgroundTransparency=1,Text="Device Spoofer",TextColor3=C.MUTED,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+local spoofStatusLbl=mk("TextLabel",{Size=UDim2.new(1,-32,0,18),Position=UDim2.fromOffset(16,264),BackgroundTransparency=1,Text="غير مفعل — اختر جهازاً يدوياً",TextColor3=C.MUTED,TextSize=10,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+local DEV_CFG={{n="Console",icon="🎮",col=C.CONS},{n="Mobile",icon="📱",col=C.MOB},{n="PC",icon="💻",col=C.PC_COL}}
+local devRows={}; local devPend=nil
 
 local function refreshDevRows()
-    for _, r in ipairs(devRows) do
-        local isPend = (r.name == devPend)
-        local isSel = (r.name == spoof.device)
-        if isPend then
-            tw(r.bg, TF, { BackgroundColor3 = C.PEND, BackgroundTransparency = 0.12 })
-            tw(r.sk, TF, { Color = C.PEND, Transparency = 0.1 })
-            r.lbl.Text = "متأكد؟  ←  إعادة الانضمام"
-            r.lbl.TextColor3 = Color3.fromRGB(255, 220, 185)
-        elseif isSel then
-            tw(r.bg, TF, { BackgroundColor3 = r.col:Lerp(C.IDLE, 0.55), BackgroundTransparency = 0.1 })
-            tw(r.sk, TF, { Color = r.col, Transparency = 0.15 })
-            r.lbl.Text = r.name .. "  ✓"
-            r.lbl.TextColor3 = r.col
-        else
-            tw(r.bg, TF, { BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35 })
-            tw(r.sk, TF, { Color = C.BORDER, Transparency = 0.88 })
-            r.lbl.Text = r.name
-            r.lbl.TextColor3 = C.TEXT
-        end
+    for _,r in ipairs(devRows) do
+        local isPend=r.name==devPend; local isSel=r.name==spoof.device
+        if isPend then tw(r.bg,TF,{BackgroundColor3=C.PEND,BackgroundTransparency=0.12}); tw(r.sk,TF,{Color=C.PEND,Transparency=0.1}); r.lbl.Text="متأكد؟  ←  إعادة الانضمام"; r.lbl.TextColor3=Color3.fromRGB(255,220,185)
+        elseif isSel then tw(r.bg,TF,{BackgroundColor3=r.col:Lerp(C.IDLE,0.55),BackgroundTransparency=0.1}); tw(r.sk,TF,{Color=r.col,Transparency=0.15}); r.lbl.Text=r.name.."  ✓"; r.lbl.TextColor3=r.col
+        else tw(r.bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.35}); tw(r.sk,TF,{Color=C.BORDER,Transparency=0.88}); r.lbl.Text=r.name; r.lbl.TextColor3=C.TEXT end
     end
 end
 
-for i, cfg in ipairs(DEV_CFG) do
-    local yP = 288 + (i - 1) * 46
-    local bg = mk("Frame", { Size = UDim2.new(1, -32, 0, 40), Position = UDim2.fromOffset(16, yP), BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35, BorderSizePixel = 0, ZIndex = 16 }, panel)
-    corner(bg, 10)
-    local sk = uistroke(bg, C.BORDER, 1, 0.88)
-    mk("TextLabel", { Size = UDim2.fromOffset(32, 40), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = cfg.icon, TextScaled = true, ZIndex = 17 }, bg)
-    local lbl = mk("TextLabel", { Size = UDim2.new(1, -50, 1, 0), Position = UDim2.fromOffset(44, 0), BackgroundTransparency = 1, Text = cfg.n, TextColor3 = C.TEXT, TextSize = 13, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17 }, bg)
-    local btn = mk("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 18 }, bg)
-    table.insert(devRows, { bg = bg, sk = sk, lbl = lbl, name = cfg.n, col = cfg.col })
-    
-    btn.MouseEnter:Connect(function() if devPend ~= cfg.n and spoof.device ~= cfg.n then tw(bg, TF, { BackgroundColor3 = Color3.fromRGB(26, 28, 44), BackgroundTransparency = 0.2 }) end end)
-    btn.MouseLeave:Connect(function() if devPend ~= cfg.n and spoof.device ~= cfg.n then tw(bg, TF, { BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35 }) end end)
-    
+for i,cfg in ipairs(DEV_CFG) do
+    local yP=288+(i-1)*46
+    local bg=mk("Frame",{Size=UDim2.new(1,-32,0,40),Position=UDim2.fromOffset(16,yP),BackgroundColor3=C.IDLE,BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=16},panel)
+    corner(bg,10); local sk=uistroke(bg,C.BORDER,1,0.88)
+    mk("TextLabel",{Size=UDim2.fromOffset(32,40),Position=UDim2.fromOffset(10,0),BackgroundTransparency=1,Text=cfg.icon,TextScaled=true,ZIndex=17},bg)
+    local lbl=mk("TextLabel",{Size=UDim2.new(1,-50,1,0),Position=UDim2.fromOffset(44,0),BackgroundTransparency=1,Text=cfg.n,TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamMedium,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},bg)
+    local btn=mk("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=18},bg)
+    table.insert(devRows,{bg=bg,sk=sk,lbl=lbl,name=cfg.n,col=cfg.col})
+    btn.MouseEnter:Connect(function() if devPend~=cfg.n and spoof.device~=cfg.n then tw(bg,TF,{BackgroundColor3=Color3.fromRGB(26,28,44),BackgroundTransparency=0.2}) end end)
+    btn.MouseLeave:Connect(function() if devPend~=cfg.n and spoof.device~=cfg.n then tw(bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.35}) end end)
     btn.MouseButton1Click:Connect(function()
-        sfx(SFX_BTN)
-        if spoof.device == cfg.n then return end
-        if devPend == cfg.n then
-            devPend = nil
-            local dev = cfg.n
-            cfgSave(dev)
-            if spoof.SD then
-                hookSD(spoof.SD, dev, function(n)
-                    spoof.device = dev
-                    spoof.patches = n
-                    spoofStatusLbl.Text = string.format("✅ %s — %d كائن", dev, n)
-                    spoofStatusLbl.TextColor3 = C.GREEN
-                    refreshDevRows()
-                end)
-            end
-            spoof.device = dev
-            lbl.Text = "جارٍ إعادة الانضمام..."
-            refreshDevRows()
-            queueSelf()
+        sfx(SFX_BTN); if spoof.device==cfg.n then return end
+        if devPend==cfg.n then
+            devPend=nil; local dev=cfg.n; cfgSave(dev)
+            if spoof.SD then hookSD(spoof.SD,dev,function(n) spoof.device=dev; spoof.patches=n; spoofStatusLbl.Text=string.format("✅ %s — %d كائن",dev,n); spoofStatusLbl.TextColor3=C.GREEN; refreshDevRows() end) end
+            spoof.device=dev; lbl.Text="جارٍ إعادة الانضمام..."; refreshDevRows()
+            cfgSave(dev); queueSelf()
             task.spawn(function()
-                task.wait(0.3)
-                local ok = pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp) end)
-                if not ok then pcall(function() TeleportService:Teleport(game.PlaceId, lp) end) end
+                task.wait(0.4)
+                local ok=pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId,game.JobId,lp) end)
+                if not ok then pcall(function() TeleportService:Teleport(game.PlaceId,lp) end) end
             end)
         else
-            if devPend then devPend = nil; refreshDevRows() end
-            devPend = cfg.n
-            refreshDevRows()
-            task.delay(4.5, function() if devPend == cfg.n then devPend = nil; refreshDevRows() end end)
+            if devPend then devPend=nil; refreshDevRows() end
+            devPend=cfg.n; refreshDevRows()
+            task.delay(4.5,function() if devPend==cfg.n then devPend=nil; refreshDevRows() end end)
         end
     end)
 end
 refreshDevRows()
-
-mk("Frame", { Size = UDim2.new(1, -32, 0, 1), Position = UDim2.fromOffset(16, 430), BackgroundColor3 = C.BORDER, BackgroundTransparency = 0.9, BorderSizePixel = 0, ZIndex = 16 }, panel)
-mk("TextLabel", { Size = UDim2.new(1, -32, 0, 22), Position = UDim2.fromOffset(16, 434), BackgroundTransparency = 1, Text = "by bww-o  •  F = Lock-On  •  G = Wall Hop", TextColor3 = C.MUTED, TextSize = 10, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16 }, panel)
+mk("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.fromOffset(16,430),BackgroundColor3=C.BORDER,BackgroundTransparency=0.9,BorderSizePixel=0,ZIndex=16},panel)
+mk("TextLabel",{Size=UDim2.new(1,-32,0,22),Position=UDim2.fromOffset(16,434),BackgroundTransparency=1,Text="by bww-o  •  F = Lock-On  •  G = Wall Hop",TextColor3=C.MUTED,TextSize=10,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
 
 -- Resize Handle
-local resHandle = mk("Frame", { Size = UDim2.fromOffset(18, 18), Position = UDim2.new(1, -18, 1, -18), BackgroundColor3 = C.GREEN, BackgroundTransparency = 0.55, BorderSizePixel = 0, ZIndex = 25 }, panel)
-corner(resHandle, 5)
-mk("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "⤡", TextScaled = true, TextColor3 = C.GREEN, ZIndex = 26 }, resHandle)
-
-local MIN_W, MIN_H, MAX_W, MAX_H = 220, 320, 500, 640
-local resizing = false
-local resSt, resOriW, resOriH
-
+local resHandle=mk("Frame",{Size=UDim2.fromOffset(18,18),Position=UDim2.new(1,-18,1,-18),BackgroundColor3=C.GREEN,BackgroundTransparency=0.55,BorderSizePixel=0,ZIndex=25},panel)
+corner(resHandle,5); mk("TextLabel",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="⤡",TextScaled=true,TextColor3=C.GREEN,ZIndex=26},resHandle)
+local MIN_W,MIN_H,MAX_W,MAX_H=220,320,500,640
+local resizing=false; local resSt,resOriW,resOriH
 resHandle.InputBegan:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-        resizing = true
-        resSt = inp.Position
-        resOriW = panel.AbsoluteSize.X
-        resOriH = panel.AbsoluteSize.Y
+    if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+        resizing=true; resSt=inp.Position; resOriW=panel.AbsoluteSize.X; resOriH=panel.AbsoluteSize.Y
     end
 end)
-resHandle.MouseEnter:Connect(function() tw(resHandle, TF, { BackgroundTransparency = 0.15, Size = UDim2.fromOffset(24, 24), Position = UDim2.new(1, -24, 1, -24) }) end)
-resHandle.MouseLeave:Connect(function() tw(resHandle, TF, { BackgroundTransparency = 0.55, Size = UDim2.fromOffset(18, 18), Position = UDim2.new(1, -18, 1, -18) }) end)
+resHandle.MouseEnter:Connect(function() tw(resHandle,TF,{BackgroundTransparency=0.15,Size=UDim2.fromOffset(24,24),Position=UDim2.new(1,-24,1,-24)}) end)
+resHandle.MouseLeave:Connect(function() tw(resHandle,TF,{BackgroundTransparency=0.55,Size=UDim2.fromOffset(18,18),Position=UDim2.new(1,-18,1,-18)}) end)
 
--- Panel Open / Close (منطق فتح وإغلاق القائمة الأساسي الدقيق والمضبوط)
-local pDragging = false
-local pDragSt, pOrigPos
-local pDragDist = 0
-local detached = false
-local panelOpen = false
-local DETACH_THR = 32
-
+-- Input & Panel Actions
+local pDragging=false; local pDragSt,pOrigPos; local pDragDist=0
+local detached=false; local panelOpen=false; local DETACH_THR=32
 local function panelOpenPos()
-    local sw = CAM.ViewportSize.X
-    local pw = panel.AbsoluteSize.X
-    return UDim2.new(0, sw - pw - CBTN_PAD - CBTN_SZ - 8, 0.5, -panel.AbsoluteSize.Y / 2)
+    local sw=CAM.ViewportSize.X; local pw=panel.AbsoluteSize.X
+    return UDim2.new(0,sw-pw-CBTN_PAD-CBTN_SZ-8,0.5,-panel.AbsoluteSize.Y/2)
 end
-
-local function openPanel()
-    panelOpen = true
-    panel.Visible = true
-    panel.Position = UDim2.new(1, 10, 0.5, -PH / 2)
-    tw(panel, TSP, { Position = panelOpenPos() })
-    tw(pSK, TM, { Transparency = 0.70 })
-    tw(cSK, TM, { Color = C.GREEN, Transparency = 0 })
-    sfx(SFX_BTN)
-end
-
-local function closePanel()
-    panelOpen = false
-    detached = false
-    tw(panel, TSL, { Position = UDim2.new(1, panel.AbsoluteSize.X + 30, 0.5, -PH / 2) })
-    tw(pSK, TM, { Transparency = 0.88 })
-    tw(cSK, TM, { Color = C.GREEN, Transparency = 0.35 })
-    task.delay(0.46, function() if not panelOpen then panel.Visible = false end end)
-    sfx(SFX_BTN)
-end
-
--- تفعيل زر الدائرة (cBtn) الأساسي لفتح وإغلاق القائمة بدون أي مشاكل
-cBtn.MouseButton1Click:Connect(function()
-    if panelOpen then
-        closePanel()
-    else
-        openPanel()
-    end
-end)
-
+local function openPanel() panelOpen=true; panel.Visible=true; panel.Position=UDim2.new(1,10,0.5,-PH/2); tw(panel,TSP,{Position=panelOpenPos()}); tw(pSK,TM,{Transparency=0.70}); tw(cSK,TM,{Color=C.GREEN,Transparency=0}); sfx(SFX_BTN) end
+local function closePanel() panelOpen=false; detached=false; tw(panel,TSL,{Position=UDim2.new(1,panel.AbsoluteSize.X+30,0.5,-PH/2)}); tw(pSK,TM,{Transparency=0.88}); tw(cSK,TM,{Color=C.GREEN,Transparency=0.35}); task.delay(0.46,function() if not panelOpen then panel.Visible=false end end); sfx(SFX_BTN) end
+cBtn.MouseButton1Click:Connect(function() if panelOpen then closePanel() else openPanel() end end)
 minBtn.MouseButton1Click:Connect(closePanel)
 
 panel.InputBegan:Connect(function(inp)
-    if inp.UserInputType ~= Enum.UserInputType.MouseButton1 and inp.UserInputType ~= Enum.UserInputType.Touch then return end
-    local relY = inp.Position.Y - panel.AbsolutePosition.Y
-    if relY < 54 then
-        pDragging = true
-        pDragSt = inp.Position
-        pOrigPos = panel.Position
-        pDragDist = 0
-    end
+    if inp.UserInputType~=Enum.UserInputType.MouseButton1 and inp.UserInputType~=Enum.UserInputType.Touch then return end
+    local relY=inp.Position.Y-panel.AbsolutePosition.Y
+    if relY<54 then pDragging=true; pDragSt=inp.Position; pOrigPos=panel.Position; pDragDist=0 end
 end)
-
 panel.InputEnded:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-        pDragging = false
+    if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+        pDragging=false
         if detached then
-            local rightEdge = panel.AbsolutePosition.X + panel.AbsoluteSize.X
-            if rightEdge > CAM.ViewportSize.X * 0.72 then
-                tw(panel, TSP, { Position = panelOpenPos() })
-                detached = false
-                tw(pSK, TM, { Color = C.BORDER })
-            end
+            local rightEdge=panel.AbsolutePosition.X+panel.AbsoluteSize.X
+            if rightEdge>CAM.ViewportSize.X*0.72 then tw(panel,TSP,{Position=panelOpenPos()}); detached=false; tw(pSK,TM,{Color=C.BORDER}) end
         end
     end
 end)
-
 UIS.InputChanged:Connect(function(inp)
-    local t = inp.UserInputType
-    local isMouse = (t == Enum.UserInputType.MouseMovement)
-    local isTouch = (t == Enum.UserInputType.Touch)
+    local t=inp.UserInputType
+    local isMouse=t==Enum.UserInputType.MouseMovement; local isTouch=t==Enum.UserInputType.Touch
     if pDragging and (isMouse or isTouch) then
-        local delta = inp.Position - pDragSt
-        pDragDist = delta.Magnitude
-        if not detached and pDragDist > DETACH_THR then
-            detached = true
-            sfx(SFX_DETACH)
-            tw(pSK, TM, { Color = C.GOLD, Transparency = 0.22 })
-        end
-        if detached then
-            panel.Position = UDim2.new(pOrigPos.X.Scale, pOrigPos.X.Offset + delta.X, pOrigPos.Y.Scale, pOrigPos.Y.Offset + delta.Y)
-        end
+        local delta=inp.Position-pDragSt; pDragDist=delta.Magnitude
+        if not detached and pDragDist>DETACH_THR then detached=true; sfx(SFX_DETACH); tw(pSK,TM,{Color=C.GOLD,Transparency=0.22}) end
+        if detached then panel.Position=UDim2.new(pOrigPos.X.Scale,pOrigPos.X.Offset+delta.X,pOrigPos.Y.Scale,pOrigPos.Y.Offset+delta.Y) end
     end
     if resizing and (isMouse or isTouch) then
-        local d = inp.Position - resSt
-        local nW = math.clamp(resOriW + d.X, MIN_W, MAX_W)
-        local nH = math.clamp(resOriH + d.Y, MIN_H, MAX_H)
-        panel.Size = UDim2.fromOffset(nW, nH)
+        local d=inp.Position-resSt
+        local nW=math.clamp(resOriW+d.X,MIN_W,MAX_W); local nH=math.clamp(resOriH+d.Y,MIN_H,MAX_H)
+        panel.Size=UDim2.fromOffset(nW,nH)
     end
 end)
-
 UIS.InputEnded:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-        pDragging = false
-        resizing = false
-    end
+    if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then pDragging=false; resizing=false end
 end)
 
--- Close Confirm (نافذة تأكيد الإغلاق)
-local confirmOpen = false
+-- Close Confirm
+local confirmOpen=false
 xBtn.MouseButton1Click:Connect(function()
-    sfx(SFX_BTN)
-    if confirmOpen then return end
-    confirmOpen = true
-    local cf = mk("Frame", { Size = UDim2.new(1, -32, 0, 86), Position = UDim2.fromOffset(16, 56), BackgroundColor3 = Color3.fromRGB(55, 14, 14), BackgroundTransparency = 0.08, BorderSizePixel = 0, ZIndex = 30 }, panel)
-    corner(cf, 12)
-    uistroke(cf, C.RED, 1.2, 0.3)
-    mk("TextLabel", { Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 8), BackgroundTransparency = 1, Text = "هل تريد إغلاق السكربت نهائياً؟", TextColor3 = C.TEXT, TextSize = 13, Font = Enum.Font.GothamBold, ZIndex = 31 }, cf)
-    
-    local function cfBtn(text, xo, col)
-        local b = mk("TextButton", { Size = UDim2.fromOffset(108, 32), Position = UDim2.new(0, xo, 0, 46), BackgroundColor3 = col, Text = text, TextColor3 = Color3.fromRGB(255, 255, 255), TextScaled = true, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 32 }, cf)
-        corner(b, 8)
-        return b
-    end
-    
-    local yesB = cfBtn("نعم — أغلق", 14, C.RED)
-    local noB = cfBtn("لا — ارجع", 128, Color3.fromRGB(38, 40, 58))
-    
+    sfx(SFX_BTN); if confirmOpen then return end; confirmOpen=true
+    local cf=mk("Frame",{Size=UDim2.new(1,-32,0,86),Position=UDim2.fromOffset(16,56),BackgroundColor3=Color3.fromRGB(55,14,14),BackgroundTransparency=0.08,BorderSizePixel=0,ZIndex=30},panel)
+    corner(cf,12); uistroke(cf,C.RED,1.2,0.3)
+    mk("TextLabel",{Size=UDim2.new(1,0,0,36),Position=UDim2.fromOffset(0,8),BackgroundTransparency=1,Text="هل تريد إغلاق السكربت نهائياً؟",TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamBold,ZIndex=31},cf)
+    local function cfBtn(text,xo,col) local b=mk("TextButton",{Size=UDim2.fromOffset(108,32),Position=UDim2.new(0,xo,0,46),BackgroundColor3=col,Text=text,TextColor3=Color3.fromRGB(255,255,255),TextScaled=true,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=32},cf); corner(b,8); return b end
+    local yesB=cfBtn("نعم — أغلق",14,C.RED); local noB=cfBtn("لا — ارجع",128,Color3.fromRGB(38,40,58))
     yesB.MouseButton1Click:Connect(function() sfx(SFX_BTN); if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end end)
-    noB.MouseButton1Click:Connect(function() sfx(SFX_BTN); cf:Destroy(); confirmOpen = false end)
+    noB.MouseButton1Click:Connect(function() sfx(SFX_BTN); cf:Destroy(); confirmOpen=false end)
 end)
 
--- Keyboard shortcuts
-UIS.InputBegan:Connect(function(inp, gp)
+-- Keyboard Shortcuts
+UIS.InputBegan:Connect(function(inp,gp)
     if gp then return end
-    if inp.KeyCode == Enum.KeyCode.F then setLock(not lockOn()); sfx(SFX_BTN) end
-    if inp.KeyCode == Enum.KeyCode.G then setHop(not hopOn()); sfx(SFX_BTN) end
+    if inp.KeyCode==Enum.KeyCode.F then setLock(not lockOn()); sfx(SFX_BTN) end
+    if inp.KeyCode==Enum.KeyCode.G then setHop(not hopOn()); sfx(SFX_BTN) end
 end)
 
 -- Lock-On
-local targetHL = mk("Highlight", { Name = "ER_TargetESP", FillColor = Color3.fromRGB(255, 0, 0), FillTransparency = 0.6, OutlineColor = Color3.fromRGB(255, 255, 255), OutlineTransparency = 0, Enabled = false }, CoreGui)
-local curTarget, lockedName
-
+local targetHL=mk("Highlight",{Name="ER_TargetESP",FillColor=Color3.fromRGB(255,0,0),FillTransparency=0.6,OutlineColor=Color3.fromRGB(255,255,255),OutlineTransparency=0,Enabled=false},CoreGui)
+local curTarget,lockedName
 task.spawn(function()
     while mainGui.Parent do
         task.wait(0.25)
-        if not lockOn() then
-            lockedName = nil; curTarget = nil; targetHL.Enabled = false; targetHL.Adornee = nil
-            continue
-        end
-        local char = lp.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local tool = char and char:FindFirstChildOfClass("Tool")
-        if not (char and root and tool) then
-            lockedName = nil; curTarget = nil; targetHL.Enabled = false; targetHL.Adornee = nil
-            continue
-        end
-        local myPos = root.Position
+        if not lockOn() then lockedName=nil; curTarget=nil; targetHL.Enabled=false; targetHL.Adornee=nil; continue end
+        local char=lp.Character; local root=char and char:FindFirstChild("HumanoidRootPart"); local tool=char and char:FindFirstChildOfClass("Tool")
+        if not (char and root and tool) then lockedName=nil; curTarget=nil; targetHL.Enabled=false; targetHL.Adornee=nil; continue end
+        local myPos=root.Position
         if lockedName then
-            local tp = Players:FindFirstChild(lockedName)
+            local tp=Players:FindFirstChild(lockedName)
             if tp and tp.Character then
-                local tr = tp.Character:FindFirstChild("HumanoidRootPart")
-                local th = tp.Character:FindFirstChild("Humanoid")
-                if tr and th and th.Health > 0 and (myPos - tr.Position).Magnitude <= 80 then
-                    curTarget = tp; targetHL.Adornee = tp.Character; targetHL.Enabled = true
-                    continue
-                end
+                local tr=tp.Character:FindFirstChild("HumanoidRootPart"); local th=tp.Character:FindFirstChild("Humanoid")
+                if tr and th and th.Health>0 and (myPos-tr.Position).Magnitude<=80 then curTarget=tp; targetHL.Adornee=tp.Character; targetHL.Enabled=true; continue end
             end
-            lockedName = nil; curTarget = nil; targetHL.Enabled = false; targetHL.Adornee = nil
+            lockedName=nil; curTarget=nil; targetHL.Enabled=false; targetHL.Adornee=nil
         end
-        local best, bestD = nil, math.huge
-        for _, v in ipairs(Players:GetPlayers()) do
-            if v ~= lp and v.Character then
-                local tr = v.Character:FindFirstChild("HumanoidRootPart")
-                local hm = v.Character:FindFirstChild("Humanoid")
-                if tr and hm and hm.Health > 0 then
-                    local d = (myPos - tr.Position).Magnitude
-                    if d < bestD then bestD = d; best = v end
-                end
+        local best,bestD=nil,math.huge
+        for _,v in ipairs(Players:GetPlayers()) do
+            if v~=lp and v.Character then
+                local tr=v.Character:FindFirstChild("HumanoidRootPart"); local hm=v.Character:FindFirstChild("Humanoid")
+                if tr and hm and hm.Health>0 then local d=(myPos-tr.Position).Magnitude; if d<bestD then bestD=d; best=v end end
             end
         end
-        if best then
-            lockedName = best.Name; curTarget = best; targetHL.Adornee = best.Character; targetHL.Enabled = true
-        else
-            targetHL.Enabled = false; targetHL.Adornee = nil
-        end
+        if best then lockedName=best.Name; curTarget=best; targetHL.Adornee=best.Character; targetHL.Enabled=true
+        else targetHL.Enabled=false; targetHL.Adornee=nil end
     end
 end)
-
 RunService.Heartbeat:Connect(function()
     if not lockOn() or not lp.Character then return end
-    local char = lp.Character
-    local hum = char:FindFirstChild("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-    local tool = char:FindFirstChildOfClass("Tool")
+    local char=lp.Character; local hum=char:FindFirstChild("Humanoid"); local root=char:FindFirstChild("HumanoidRootPart"); local tool=char:FindFirstChildOfClass("Tool")
     if not (hum and root and tool and curTarget and curTarget.Character) then return end
-    local tr = curTarget.Character:FindFirstChild("HumanoidRootPart")
-    local th = curTarget.Character:FindFirstChild("Humanoid")
-    if not (tr and th and th.Health > 0) then return end
-    hum:MoveTo(tr.Position)
-    if (root.Position - tr.Position).Magnitude < 2 then
-        hum:MoveTo(tr.Position + tr.CFrame.LookVector * 2)
-    end
+    local tr=curTarget.Character:FindFirstChild("HumanoidRootPart"); local th=curTarget.Character:FindFirstChild("Humanoid")
+    if not (tr and th and th.Health>0) then return end
+    hum:MoveTo(tr.Position); if (root.Position-tr.Position).Magnitude<2 then hum:MoveTo(tr.Position+tr.CFrame.LookVector*2) end
 end)
 
 -- Wall Hop
-local debounce = true
-local rP = RaycastParams.new()
-rP.FilterType = Enum.RaycastFilterType.Exclude
-
+local debounce=true; local rP=RaycastParams.new(); rP.FilterType=Enum.RaycastFilterType.Exclude
 local function getWall()
-    local c = lp.Character
-    local r = c and c:FindFirstChild("HumanoidRootPart")
-    if not r then return nil end
-    rP.FilterDescendantsInstances = { c }
-    local h, md = nil, 2.6
-    for _, d in ipairs({ r.CFrame.LookVector, -r.CFrame.LookVector, r.CFrame.RightVector, -r.CFrame.RightVector }) do
-        local ry = workspace:Raycast(r.Position, d * 2.5, rP)
-        if ry and ry.Distance < md then md = ry.Distance; h = ry end
-    end
-    return h
+    local c=lp.Character; local r=c and c:FindFirstChild("HumanoidRootPart"); if not r then return nil end
+    rP.FilterDescendantsInstances={c}; local h,md=nil,2.6
+    for _,d in ipairs({r.CFrame.LookVector,-r.CFrame.LookVector,r.CFrame.RightVector,-r.CFrame.RightVector}) do
+        local ry=workspace:Raycast(r.Position,d*2.5,rP); if ry and ry.Distance<md then md=ry.Distance; h=ry end
+    end; return h
 end
-
 UIS.JumpRequest:Connect(function()
     if not hopOn() or not debounce then return end
-    local c = lp.Character
-    local hum = c and c:FindFirstChildOfClass("Humanoid")
-    local r = c and c:FindFirstChild("HumanoidRootPart")
-    if not (hum and r and hum.Health > 0) then return end
-    local w = getWall()
-    if w then
-        debounce = false
-        local wn = w.Normal
-        local hwn = Vector3.new(wn.X, 0, wn.Z).Unit
-        if hwn.Magnitude < 0.1 then hwn = (r.CFrame.LookVector * Vector3.new(1, 0, 1)).Unit end
-        local b = hwn
-        local hcl = Vector3.new(CAM.CFrame.LookVector.X, 0, CAM.CFrame.LookVector.Z).Unit
-        local dt = math.clamp(b:Dot(hcl), -1, 1)
-        local ab = math.acos(dt)
-        local cr = b:Cross(hcl)
-        local rs = math.sign(cr.Y)
-        if rs == 0 then ab = 0 end
-        local it = CFrame.Angles(0, math.min(ab, math.rad(40)) * rs, 0) * b
-        r.CFrame = CFrame.lookAt(r.Position, r.Position + it)
-        RunService.Heartbeat:Wait()
-        hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        r.CFrame = CFrame.lookAt(r.Position, r.Position - b)
-        task.wait(0.15)
-        debounce = true
+    local c=lp.Character; local hum=c and c:FindFirstChildOfClass("Humanoid"); local r=c and c:FindFirstChild("HumanoidRootPart")
+    if not (hum and r and hum.Health>0) then return end
+    local w=getWall(); if w then
+        debounce=false; local wn=w.Normal; local hwn=Vector3.new(wn.X,0,wn.Z).Unit
+        if hwn.Magnitude<0.1 then hwn=(r.CFrame.LookVector*Vector3.new(1,0,1)).Unit end
+        local b=hwn; local hcl=Vector3.new(CAM.CFrame.LookVector.X,0,CAM.CFrame.LookVector.Z).Unit
+        local dt=math.clamp(b:Dot(hcl),-1,1); local ab=math.acos(dt); local cr=b:Cross(hcl); local rs=math.sign(cr.Y)
+        if rs==0 then ab=0 end
+        local it=CFrame.Angles(0,math.min(ab,math.rad(40))*rs,0)*b
+        r.CFrame=CFrame.lookAt(r.Position,r.Position+it); RunService.Heartbeat:Wait()
+        hum:ChangeState(Enum.HumanoidStateType.Jumping); r.CFrame=CFrame.lookAt(r.Position,r.Position-b)
+        task.wait(0.15); debounce=true
     end
 end)
 
 -- Status Update
 task.spawn(function()
-    while mainGui.Parent do
-        task.wait(3)
-        if spoof.device and spoof.patches > 0 then
-            spoofStatusLbl.Text = string.format("✅ %s — %d كائن", spoof.device, spoof.patches)
-            spoofStatusLbl.TextColor3 = C.GREEN
-        elseif spoof.device and spoof.hooked then
-            spoofStatusLbl.Text = "Hook جاهز — ينتظر SetDevice"
-            spoofStatusLbl.TextColor3 = C.MUTED
-        else
-            spoofStatusLbl.Text = "غير مفعل — اختر جهازاً يدوياً"
-            spoofStatusLbl.TextColor3 = C.MUTED
-        end
+    while mainGui.Parent do task.wait(3)
+        if spoof.device and spoof.patches>0 then spoofStatusLbl.Text=string.format("✅ %s — %d كائن",spoof.device,spoof.patches); spoofStatusLbl.TextColor3=C.GREEN
+        elseif spoof.device and spoof.hooked then spoofStatusLbl.Text="Hook جاهز — ينتظر SetDevice"; spoofStatusLbl.TextColor3=C.MUTED
+        else spoofStatusLbl.Text="غير مفعل — اختر جهازاً يدوياً"; spoofStatusLbl.TextColor3=C.MUTED end
     end
 end)
 
--- Device Spoofer Hook Setup
+-- تهيئة الـ Hook والجهاز المخزن
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
-    local Rem = RS:WaitForChild("Remotes", 25)
-    if not Rem then return end
-    local Repl = Rem:WaitForChild("Replicator", 25)
-    if not Repl then return end
-    local SD = Repl:WaitForChild("SetDevice", 25)
-    if not SD then return end
-    spoof.SD = SD
-    local saved = cfgLoad()
+    local Rem=RS:WaitForChild("Remotes",25); if not Rem then return end
+    local Repl=Rem:WaitForChild("Replicator",25); if not Repl then return end
+    local SD=Repl:WaitForChild("SetDevice",25); if not SD then return end
+    spoof.SD=SD
+    local saved=cfgLoad()
     if saved then
-        spoof.device = saved
+        spoof.device=saved
         refreshDevRows()
-        hookSD(SD, saved, function(n)
-            spoof.patches = n
-            spoofStatusLbl.Text = string.format("✅ %s — %d كائن", saved, n)
-            spoofStatusLbl.TextColor3 = C.GREEN
+        hookSD(SD,saved,function(n)
+            spoof.patches=n
+            spoofStatusLbl.Text=string.format("✅ %s — %d كائن",saved,n)
+            spoofStatusLbl.TextColor3=C.GREEN
             refreshDevRows()
         end)
         task.spawn(function()
-            task.wait(0.5)
-            spoof.patches = gcWalk(saved)
-            spoofStatusLbl.Text = string.format("✅ %s — جاهز", saved)
-            spoofStatusLbl.TextColor3 = C.GREEN
+            task.wait(0.8)
+            spoof.patches=gcWalk(saved)
+            spoofStatusLbl.Text=string.format("✅ %s — جاهز",saved)
+            spoofStatusLbl.TextColor3=C.GREEN
         end)
     end
 end)
