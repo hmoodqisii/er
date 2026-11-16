@@ -1,7 +1,7 @@
 --[[
 ╔══════════════════════════════════════════════════════════╗
-║              ER Script v5.5  —  by bww-o                   ║
-║  Lock-On · WallHop · FPS · Device Spoofer (Clean & Fixed)║
+║              ER Script v5.6  —  by bww-o                   ║
+║  Lock-On · WallHop · FPS · Device Spoofer (Fixed Save)   ║
 ╚══════════════════════════════════════════════════════════╝
 ]]
 
@@ -21,20 +21,21 @@ local PG = lp:WaitForChild("PlayerGui")
 local CAM = workspace.CurrentCamera
 local SCRIPT_URL = "https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"
 
--- تصحيح وتنظيف دالة حفظ وسائط التليبرت وخلوها تماماً من أي أحرف مخفية
+-- نظام حفظ تليبرت محسن وثابت يضمن انتقال الإعدادات
 local function queueSelf()
     if not queue_on_teleport then return end
-    local code = [[
+    local currentDev = _G.ER_SELECTED_DEVICE or "PC"
+    local code = string.format([[
 if not game:IsLoaded() then game.Loaded:Wait() end
+_G.ER_SELECTED_DEVICE = "%s"
 task.wait(1)
 pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"))()
 end)
-]]
+]], currentDev)
     pcall(function() queue_on_teleport(code) end)
 end
 
--- منع التشغيل المزدوج
 if _G.ER_LOADED then
     if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end
 end
@@ -86,18 +87,31 @@ end
 local function corner(p, r) return mk("UICorner", { CornerRadius = UDim.new(0, r or 12) }, p) end
 local function uistroke(p, col, th, tr) return mk("UIStroke", { Color = col or C.BORDER, Thickness = th or 1.2, Transparency = tr or 0.80 }, p) end
 
--- Device Spoofer
+-- Device Spoofer (معالجة الحفظ المزدوج عبر الملفات و _G لضمان عدم الضياع)
 local VALID = { Console = true, Mobile = true, PC = true }
-local CFG = "er_dspoofcfg_v5.bin"
-local spoof = { device = nil, SD = nil, hooked = false, cleanup = nil, patches = 0 }
+local CFG = "er_dspoofcfg_v6.bin"
+local spoof = { device = _G.ER_SELECTED_DEVICE or nil, SD = nil, hooked = false, cleanup = nil, patches = 0 }
 
-local function cfgSave(d) if writefile then pcall(function() writefile(CFG, d) end) end end
+local function cfgSave(d)
+    _G.ER_SELECTED_DEVICE = d
+    if writefile then
+        pcall(function() writefile(CFG, d) end)
+    end
+end
+
 local function cfgLoad()
-    if not readfile then return nil end
-    local ok, v = pcall(function() return readfile(CFG) end)
-    if ok and v then
-        local d = v:match("^%s*(%a+)%s*$")
-        if d and VALID[d] then return d end
+    if _G.ER_SELECTED_DEVICE and VALID[_G.ER_SELECTED_DEVICE] then
+        return _G.ER_SELECTED_DEVICE
+    end
+    if readfile then
+        local ok, v = pcall(function() return readfile(CFG) end)
+        if ok and v then
+            local d = v:match("^%s*(%a+)%s*$")
+            if d and VALID[d] then
+                _G.ER_SELECTED_DEVICE = d
+                return d
+            end
+        end
     end
     return nil
 end
