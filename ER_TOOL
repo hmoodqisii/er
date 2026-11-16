@@ -1,1 +1,737 @@
+--[[
+╔══════════════════════════════════════════════════════════╗
+║              ER Script v5  —  by bww-o                   ║
+║  Lock-On · WallHop · FPS · Device Spoofer · True Join   ║
+╚══════════════════════════════════════════════════════════╝
+]]
 
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- [1] الخدمات الأساسية
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local RS = game:GetService("ReplicatedStorage")
+local SS = game:GetService("SoundService")
+local Debris = game:GetService("Debris")
+
+local lp = Players.LocalPlayer
+local PG = lp:WaitForChild("PlayerGui")
+local CAM = workspace.CurrentCamera
+local SCRIPT_URL = "https://raw.githubusercontent.com/hmoodqisii/er/main/ER_TOOL"
+
+-- [2] دوال مساعدة لـ Debug Logs وحفظ السكربت عند الانتقال
+local function debugLog(msg)
+    print(string.format("[ER-Debug][%s]: %s", os.date("%H:%M:%S"), tostring(msg)))
+end
+
+local function queueSelf()
+    if type(queue_on_teleport) ~= "function" then
+        debugLog("queue_on_teleport غير متوفرة في هذه البيئة.")
+        return
+    end
+    local code = string.format([[
+if not game:IsLoaded() then game.Loaded:Wait() end
+task.wait(1.5)
+local ok, err = pcall(function() loadstring(game:HttpGet("%s"))() end)
+if not ok then warn("[ER] "..tostring(err)) end
+]], SCRIPT_URL)
+    local ok, err = pcall(function()
+        queue_on_teleport(code)
+    end)
+    if ok then
+        debugLog("تم جدولة السكربت بنجاح لـ True Join عبر queue_on_teleport")
+    else
+        debugLog("فشل جدولة السكربت: " .. tostring(err))
+    end
+end
+
+-- منع التشغيل المزدوج وتنظيف النسخ القديمة
+if _G.ER_LOADED then
+    if type(_G.ER_CLEANUP) == "function" then
+        pcall(_G.ER_CLEANUP)
+    end
+end
+_G.ER_LOADED = true
+
+-- [3] نظام الصوتيات
+local function sfx(id)
+    local ok, s = pcall(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://" .. tostring(id)
+        sound.Volume = 0.55
+        sound.Parent = SS
+        sound:Play()
+        Debris:AddItem(sound, 5)
+    end)
+end
+local SFX_DETACH = 12221944
+local SFX_BTN = 12221967
+
+-- الألوان والتصميم
+local C = {
+    BG = Color3.fromRGB(9,9,14), SURF = Color3.fromRGB(16,17,26), TEXT = Color3.fromRGB(228,230,244),
+    MUTED = Color3.fromRGB(90,92,118), BORDER = Color3.fromRGB(255,255,255), GREEN = Color3.fromRGB(45,215,90),
+    BLUE = Color3.fromRGB(55,135,255), GOLD = Color3.fromRGB(238,185,42), RED = Color3.fromRGB(215,55,55),
+    IDLE = Color3.fromRGB(20,22,34), PEND = Color3.fromRGB(215,105,20),
+    CONS = Color3.fromRGB(95,55,195), MOB = Color3.fromRGB(25,145,215), PC_COL = Color3.fromRGB(38,175,85),
+}
+
+local function ti(t, s, d) return TweenInfo.new(t, s or Enum.EasingStyle.Quad, d or Enum.EasingDirection.Out) end
+local TF = ti(0.15)
+local TM = ti(0.26)
+local TSP = ti(0.36, Enum.EasingStyle.Back)
+local TSL = ti(0.44)
+
+local function tw(o, i, p)
+    pcall(function() TweenService:Create(o, i, p):Play() end)
+end
+
+local function mk(cls, props, parent)
+    local o = Instance.new(cls)
+    for k, v in pairs(props) do o[k] = v end
+    if parent then o.Parent = parent end
+    return o
+end
+
+local function corner(p, r) return mk("UICorner", {CornerRadius = UDim.new(0, r or 12)}, p) end
+local function uistroke(p, col, th, tr) return mk("UIStroke", {Color = col or C.BORDER, Thickness = th or 1.2, Transparency = tr or 0.80}, p) end
+
+-- [4] نظام إدارة الإعدادات وحفظها (معزول تماماً)
+local CFG_FILE = "er_dspoofcfg_v5.bin"
+local VALID_DEVICES = {Console = true, Mobile = true, PC = true}
+
+local function saveSettings(device)
+    if type(writefile) == "function" and type(makefolder) == "function" then
+        pcall(function()
+            if type(isfolder) == "function" and not isfolder("ER_Data") then
+                makefolder("ER_Data")
+            end
+            writefile("ER_Data/" .. CFG_FILE, tostring(device))
+            debugLog("تم حفظ الإعدادات بنجاح لجهاز: " .. tostring(device))
+        end)
+    end
+end
+
+local function loadSettings()
+    local path = "ER_Data/" .. CFG_FILE
+    if type(readfile) == "function" and type(isfile) == "function" and isfile(path) then
+        local ok, v = pcall(function() return readfile(path) end)
+        if ok and v then
+            local d = v:match("^%s*(%a+)%s*$")
+            if d and VALID_DEVICES[d] then
+                debugLog("تم استرجاع الإعدادات المحفوظة: " .. tostring(d))
+                return d
+            end
+        end
+    elseif type(readfile) == "function" then
+        -- محاولة القراءة المباشرة إن لم تتواجد المجلدات
+        local ok, v = pcall(function() return readfile(CFG_FILE) end)
+        if ok and v then
+            local d = v:match("^%s*(%a+)%s*$")
+            if d and VALID_DEVICES[d] then return d end
+        end
+    end
+    return nil
+end
+
+-- [5] Device Spoofer الأساسي مع فحص توفر الوظائف
+local spoof = {device = nil, SD = nil, hooked = false, cleanup = nil, patches = 0}
+
+local function gcWalk(targetDevice)
+    if type(getgc) ~= "function" or not targetDevice then return 0 end
+    local ok, pool = pcall(function() return getgc(true) end)
+    if not ok or type(pool) ~= "table" then return 0 end
+    local n = 0
+    for i, obj in ipairs(pool) do
+        if i > 150000 then break end
+        if type(obj) ~= "table" then continue end
+        
+        local ok1, cur = pcall(function() return rawget(obj, "Device") end)
+        if ok1 and VALID_DEVICES[cur] and cur ~= targetDevice then
+            pcall(function() rawset(obj, "Device", targetDevice) end)
+            n += 1
+            local ok2, fn = pcall(function() return rawget(obj, "FixXCoordinateAspectRate") end)
+            if ok2 and type(fn) == "function" then pcall(function() fn(obj) end) end
+        end
+        
+        local ok3, pref = pcall(function() return rawget(obj, "PreferredInput") end)
+        if ok3 and type(pref) == "table" then
+            local wk = targetDevice == "Console" and "Gamepad" or (targetDevice == "Mobile" and "Touch" or "Keyboard")
+            local ok4, w = pcall(function() return rawget(obj, wk) end)
+            if ok4 and type(w) == "table" and pref ~= w then
+                pcall(function() rawset(obj, "PreferredInput", w) end)
+            end
+        end
+    end
+    debugLog("Device Spoofer GC Walk executed. Patched objects: " .. tostring(n))
+    return n
+end
+
+local function hookSD(SD, targetDevice, cb)
+    if spoof.cleanup then pcall(function() spoof.cleanup() end) end
+    spoof.SD = SD
+    spoof.hooked = false
+    spoof.cleanup = nil
+    local fired = false
+
+    if type(hookfunction) == "function" and type(newcclosure) == "function" then
+        local old
+        local ok = pcall(function()
+            old = hookfunction(SD.FireServer, newcclosure(function(self, ...)
+                if self == SD and not fired then
+                    fired = true
+                    spoof.hooked = true
+                    task.spawn(function()
+                        local n = gcWalk(targetDevice)
+                        spoof.patches = n
+                        if cb then cb(n) end
+                    end)
+                    return old(self, targetDevice)
+                end
+                return old(self, ...)
+            end))
+        end)
+        if ok then
+            spoof.cleanup = function() pcall(function() hookfunction(SD.FireServer, old) end) end
+            debugLog("تم تطبيق Hook بنجاح عبر hookfunction")
+            return true
+        end
+    end
+
+    if type(hookmetamethod) == "function" and type(getrawmetatable) == "function" and type(setreadonly) == "function" then
+        local mt = getrawmetatable(game)
+        if mt then
+            local oi = mt.__namecall
+            local ok = pcall(function()
+                setreadonly(mt, false)
+                mt.__namecall = newcclosure(function(self, ...)
+                    if type(getnamecallmethod) == "function" and getnamecallmethod() == "FireServer" and self == SD and not fired then
+                        fired = true
+                        spoof.hooked = true
+                        task.spawn(function()
+                            local n = gcWalk(targetDevice)
+                            spoof.patches = n
+                            if cb then cb(n) end
+                        end)
+                        return oi(self, targetDevice)
+                    end
+                    return oi(self, ...)
+                end)
+                setreadonly(mt, true)
+            end)
+            if ok then
+                spoof.cleanup = function()
+                    pcall(function()
+                        setreadonly(mt, false)
+                        mt.__namecall = oi
+                        setreadonly(mt, true)
+                    end)
+                end
+                debugLog("تم تطبيق Hook بنجاح عبر hookmetamethod")
+                return true
+            end
+        end
+    end
+
+    debugLog("فشل تطبيق الـ Hook عبر الأدوات المتاحة.")
+    return false
+end
+
+-- [6] واجهة المستخدم المتوافقة والمتحكم بحجمها (مع زر مغناطيس مثبت)
+local mainGui = mk("ScreenGui", {Name = "ER_Main", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999999}, PG)
+
+-- إعدادات الإضاءة الأصلية للـ FPS Boost
+local origL = {GlobalShadows = Lighting.GlobalShadows, Brightness = Lighting.Brightness, FogEnd = Lighting.FogEnd}
+local origE = {}
+for _, v in pairs(Lighting:GetDescendants()) do
+    if v.Name == "ER_Blur" then continue end
+    if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+        origE[v] = v.Enabled
+    elseif v:IsA("Atmosphere") then
+        origE[v] = v.Density
+    end
+end
+
+local fpsActive = false
+
+_G.ER_CLEANUP = function()
+    if mainGui and mainGui.Parent then mainGui:Destroy() end
+    if spoof.cleanup then pcall(function() spoof.cleanup() end) end
+    local hl = CoreGui:FindFirstChild("ER_TargetESP")
+    if hl then hl:Destroy() end
+    if fpsActive then
+        pcall(function()
+            Lighting.GlobalShadows = origL.GlobalShadows
+            Lighting.Brightness = origL.Brightness
+            Lighting.FogEnd = origL.FogEnd
+            for v, val in pairs(origE) do
+                pcall(function()
+                    if v:IsA("Atmosphere") then v.Density = val else v.Enabled = val end
+                end)
+            end
+        end)
+    end
+    _G.ER_LOADED = false
+    debugLog("تم تنظيف السكربت وإيقافه بنجاح.")
+end
+
+-- زر فتح وإغلاق القائمة + زر المغناطيس المرفق بجانبه مباشرة (بدون سحب عشوائي للمغناطيس)
+local CBTN_SZ, CBTN_PAD = 48, 14
+
+-- زر القائمة الأساسي
+local cBtn = mk("TextButton", {
+    Size = UDim2.fromOffset(CBTN_SZ, CBTN_SZ),
+    Position = UDim2.new(1, -(CBTN_SZ + CBTN_PAD), 0.5, -CBTN_SZ / 2 - 30), -- تم رفع الزر قليلاً للأعلى بفارق بسيط
+    BackgroundColor3 = C.SURF,
+    Text = "ER",
+    TextColor3 = C.GREEN,
+    Font = Enum.Font.GothamBlack,
+    TextSize = 15,
+    AutoButtonColor = false,
+    ClipsDescendants = true,
+    ZIndex = 20
+}, mainGui)
+corner(cBtn, CBTN_SZ / 2)
+local cSK = uistroke(cBtn, C.GREEN, 1.8, 0.35)
+mk("UIGradient", {Rotation = 45, Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 34, 48)), ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 20))})}, cBtn)
+
+-- زر المغناطيس (مرفق فوق/جانب الزر الرئيسي مباشرة وثابت غير قابل للتحريك العشوائي)
+local magBtn = mk("TextButton", {
+    Size = UDim2.fromOffset(36, 36),
+    Position = UDim2.new(1, -(CBTN_SZ + CBTN_PAD + 44), 0.5, -CBTN_SZ / 2 - 30), -- بجانب زر ER مباشرة
+    BackgroundColor3 = C.SURF,
+    Text = "🧲",
+    TextSize = 16,
+    AutoButtonColor = false,
+    ZIndex = 20
+}, mainGui)
+corner(magBtn, 18)
+uistroke(magBtn, C.BLUE, 1.4, 0.4)
+
+local magnetActive = false
+magBtn.MouseButton1Click:Connect(function()
+    sfx(SFX_BTN)
+    magnetActive = not magnetActive
+    if magnetActive then
+        tw(magBtn, TF, {BackgroundColor3 = C.BLUE})
+        debugLog("نظام المغناطيس (Lock-On Assist): مفعل")
+    else
+        tw(magBtn, TF, {BackgroundColor3 = C.SURF})
+        debugLog("نظام المغناطيس: معطل")
+    end
+end)
+
+-- اللوحة الرئيسية (Panel) مع ضبط الحجم أوتوماتيكياً لكي تتوافق مع الشاشة ولا تتجاوزها
+local screenSz = CAM.ViewportSize
+local PW = math.clamp(screenSz.X * 0.28, 240, 320)
+local PH = math.clamp(screenSz.Y * 0.65, 380, 480)
+
+local panel = mk("Frame", {
+    Size = UDim2.fromOffset(PW, PH),
+    Position = UDim2.new(1, PW + 30, 0.5, -PH / 2),
+    BackgroundColor3 = C.BG,
+    BackgroundTransparency = 0.05,
+    ClipsDescendants = true,
+    BorderSizePixel = 0,
+    Visible = false,
+    ZIndex = 15
+}, mainGui)
+corner(panel, 16)
+local pSK = uistroke(panel, C.BORDER, 1.1, 0.88)
+mk("UIGradient", {
+    Rotation = 110,
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(46, 52, 76)),
+        ColorSequenceKeypoint.new(0.4, Color3.fromRGB(13, 14, 21)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(7, 7, 12))
+    }),
+    Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.44),
+        NumberSequenceKeypoint.new(0.4, 0.04),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+}, panel)
+
+local hdr = mk("Frame", {Size = UDim2.new(1, 0, 0, 46), BackgroundTransparency = 1, ZIndex = 16}, panel)
+mk("TextLabel", {
+    Size = UDim2.new(1, -80, 1, 0), Position = UDim2.fromOffset(14, 0),
+    BackgroundTransparency = 1, Text = "ER Script v5", TextColor3 = C.TEXT,
+    TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17
+}, hdr)
+
+local function hdrBtn(text, xOff, bgCol)
+    local b = mk("TextButton", {
+        Size = UDim2.fromOffset(26, 26), Position = UDim2.new(1, xOff, 0.5, -13),
+        BackgroundColor3 = bgCol or Color3.fromRGB(38, 38, 52), BackgroundTransparency = 0.35,
+        Text = text, TextColor3 = Color3.fromRGB(210, 210, 220), TextSize = 15,
+        Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 17
+    }, hdr)
+    corner(b, 7)
+    return b
+end
+local minBtn = hdrBtn("−", -62)
+local xBtn = hdrBtn("×", -30, Color3.fromRGB(80, 18, 18))
+xBtn.TextColor3 = Color3.fromRGB(220, 155, 155)
+
+mk("Frame", {Size = UDim2.new(1, -28, 0, 1), Position = UDim2.fromOffset(14, 46), BackgroundColor3 = C.BORDER, BackgroundTransparency = 0.86, BorderSizePixel = 0, ZIndex = 16}, panel)
+
+-- زر تعزيز الأداء (FPS Boost)
+local fpsBtn = mk("TextButton", {
+    Size = UDim2.new(1, -28, 0, 34), Position = UDim2.fromOffset(14, 54),
+    BackgroundColor3 = Color3.fromRGB(30, 80, 34), BackgroundTransparency = 0.3,
+    Text = "⚡  FPS Boost", TextColor3 = C.TEXT, TextSize = 12, Font = Enum.Font.GothamBold,
+    AutoButtonColor = false, ZIndex = 16
+}, panel)
+corner(fpsBtn, 10)
+uistroke(fpsBtn, C.BORDER, 1, 0.88)
+
+fpsBtn.MouseButton1Click:Connect(function()
+    sfx(SFX_BTN)
+    if not fpsActive then
+        fpsActive = true
+        Lighting.GlobalShadows = false
+        Lighting.Brightness = 2
+        Lighting.FogEnd = 9e9
+        for _, v in pairs(Lighting:GetDescendants()) do
+            if v.Name == "ER_Blur" then continue end
+            if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+                v.Enabled = false
+            elseif v:IsA("Atmosphere") then
+                v.Density = 0
+            end
+        end
+        fpsBtn.Text = "⚡  Boosted ✅"
+    else
+        fpsActive = false
+        Lighting.GlobalShadows = origL.GlobalShadows
+        Lighting.Brightness = origL.Brightness
+        Lighting.FogEnd = origL.FogEnd
+        for v, val in pairs(origE) do
+            pcall(function()
+                if v:IsA("Atmosphere") then v.Density = val else v.Enabled = val end
+            end)
+        end
+        fpsBtn.Text = "⚡  FPS Boost"
+    end
+end)
+
+-- صفوف التفعيل (Toggles)
+local function mkToggleRow(label, yPos, colorOn)
+    local bg = mk("Frame", {Size = UDim2.new(1, -28, 0, 40), Position = UDim2.fromOffset(14, yPos), BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 16}, panel)
+    corner(bg, 10)
+    local sk = uistroke(bg, C.BORDER, 1, 0.88)
+    local lbl = mk("TextLabel", {Size = UDim2.new(1, -52, 1, 0), Position = UDim2.fromOffset(12, 0), BackgroundTransparency = 1, Text = label, TextColor3 = C.TEXT, TextSize = 12, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17}, bg)
+    local pill = mk("Frame", {Size = UDim2.fromOffset(40, 22), Position = UDim2.new(1, -48, 0.5, -11), BackgroundColor3 = Color3.fromRGB(38, 38, 52), BorderSizePixel = 0, ZIndex = 17}, bg)
+    corner(pill, 11)
+    local dot = mk("Frame", {Size = UDim2.fromOffset(16, 16), Position = UDim2.fromOffset(3, 3), BackgroundColor3 = C.MUTED, BorderSizePixel = 0, ZIndex = 18}, pill)
+    corner(dot, 8)
+    local btn = mk("TextButton", {Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 19}, bg)
+    
+    local on = false
+    local function set(state)
+        on = state
+        if on then
+            tw(bg, TSP, {BackgroundColor3 = colorOn:Lerp(C.IDLE, 0.6)})
+            tw(sk, TM, {Color = colorOn, Transparency = 0.18})
+            tw(dot, TSP, {BackgroundColor3 = colorOn, Position = UDim2.fromOffset(21, 3)})
+            lbl.TextColor3 = colorOn
+        else
+            tw(bg, TM, {BackgroundColor3 = C.IDLE})
+            tw(sk, TM, {Color = C.BORDER, Transparency = 0.88})
+            tw(dot, TSP, {BackgroundColor3 = C.MUTED, Position = UDim2.fromOffset(3, 3)})
+            lbl.TextColor3 = C.TEXT
+        end
+    end
+    btn.MouseButton1Click:Connect(function() sfx(SFX_BTN); set(not on) end)
+    return set, function() return on end
+end
+
+mk("TextLabel", {Size = UDim2.new(1, -28, 0, 20), Position = UDim2.fromOffset(14, 98), BackgroundTransparency = 1, Text = "أدوات القتال", TextColor3 = C.MUTED, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16}, panel)
+local setLock, lockOn = mkToggleRow("🎯  Lock-On", 120, C.GREEN)
+local setHop, hopOn = mkToggleRow("🧱  Wall Hop", 166, C.BLUE)
+
+mk("Frame", {Size = UDim2.new(1, -28, 0, 1), Position = UDim2.fromOffset(14, 212), BackgroundColor3 = C.BORDER, BackgroundTransparency = 0.9, BorderSizePixel = 0, ZIndex = 16}, panel)
+mk("TextLabel", {Size = UDim2.new(1, -28, 0, 18), Position = UDim2.fromOffset(14, 218), BackgroundTransparency = 1, Text = "Device Spoofer", TextColor3 = C.MUTED, TextSize = 11,Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16}, panel)
+
+local spoofStatusLbl = mk("TextLabel", {Size = UDim2.new(1, -28, 0, 16), Position = UDim2.fromOffset(14, 238), BackgroundTransparency = 1, Text = "غير مفعل — اختر جهازاً", TextColor3 = C.MUTED, TextSize = 10, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16}, panel)
+
+-- أزرار تغيير الجهاز (Console, Mobile, PC) مع True Join آمن معالجة أخطاء TeleportInitFailed
+local DEV_CFG = {
+    {n = "Console", icon = "🎮", col = C.CONS},
+    {n = "Mobile", icon = "📱", col = C.MOB},
+    {n = "PC", icon = "💻", col = C.PC_COL}
+}
+
+local devRows = {}
+local devPend = nil
+
+local function refreshDevRows()
+    for _, r in ipairs(devRows) do
+        local isPend = (r.name == devPend)
+        local isSel = (r.name == spoof.device)
+        if isPend then
+            tw(r.bg, TF, {BackgroundColor3 = C.PEND, BackgroundTransparency = 0.12})
+            r.lbl.Text = "متأكد؟  ←  انضمام حقيقي"
+            r.lbl.TextColor3 = Color3.fromRGB(255, 220, 185)
+        elseif isSel then
+            tw(r.bg, TF, {BackgroundColor3 = r.col:Lerp(C.IDLE, 0.55), BackgroundTransparency = 0.1})
+            r.lbl.Text = r.name .. "  ✓"
+            r.lbl.TextColor3 = r.col
+        else
+            tw(r.bg, TF, {BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35})
+            r.lbl.Text = r.name
+            r.lbl.TextColor3 = C.TEXT
+        end
+    end
+end
+
+for i, cfg in ipairs(DEV_CFG) do
+    local yP = 260 + (i - 1) * 42
+    local bg = mk("Frame", {Size = UDim2.new(1, -28, 0, 38), Position = UDim2.fromOffset(14, yP), BackgroundColor3 = C.IDLE, BackgroundTransparency = 0.35, BorderSizePixel = 0, ZIndex = 16}, panel)
+    corner(bg, 9)
+    local sk = uistroke(bg, C.BORDER, 1, 0.88)
+    mk("TextLabel", {Size = UDim2.fromOffset(28, 38), Position = UDim2.fromOffset(8, 0), BackgroundTransparency = 1, Text = cfg.icon, TextScaled = true, ZIndex = 17}, bg)
+    local lbl = mk("TextLabel", {Size = UDim2.new(1, -44, 1, 0), Position = UDim2.fromOffset(38, 0), BackgroundTransparency = 1, Text = cfg.n, TextColor3 = C.TEXT, TextSize = 12, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 17}, bg)
+    local btn = mk("TextButton", {Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 18}, bg)
+    
+    table.insert(devRows, {bg = bg, sk = sk, lbl = lbl, name = cfg.n, col = cfg.col})
+    
+    btn.MouseButton1Click:Connect(function()
+        sfx(SFX_BTN)
+        if spoof.device == cfg.n then return end
+        if devPend == cfg.n then
+            devPend = nil
+            local dev = cfg.n
+            saveSettings(dev)
+            spoof.device = dev
+            refreshDevRows()
+            
+            -- True Join مع الحفاظ على PlaceId و JobId ومعالجة أخطاء TeleportInitFailed
+            queueSelf()
+            task.spawn(function()
+                task.wait(0.3)
+                debugLog("بدء True Join الانتقال الفعلي إلى السيرفر الحالي بالهوية الجديدة...")
+                local ok, err = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
+                end)
+                if not ok then
+                    debugLog("فشل TeleportToPlaceInstance، المحاولة عبر Teleport العادي: " .. tostring(err))
+                    pcall(function()
+                        TeleportService:Teleport(game.PlaceId, lp)
+                    end)
+                end
+            end)
+        else
+            if devPend then devPend = nil end
+            devPend = cfg.n
+            refreshDevRows()
+            task.delay(4, function()
+                if devPend == cfg.n then
+                    devPend = nil
+                    refreshDevRows()
+                end
+            end)
+        end
+    end)
+end
+refreshDevRows()
+
+-- معالجة أخطاء الانتقال TeleportInitFailed
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    if player == lp then
+        debugLog(string.format("خطأ في الانتقال (TeleportInitFailed): %s | السبب: %s", tostring(teleportResult), tostring(errorMessage)))
+        spoofStatusLbl.Text = "❌ فشل الانتقال، أعد المحاولة"
+        spoofStatusLbl.TextColor3 = C.RED
+    end
+end)
+
+-- [7] التحكم بفتح وإغلاق واجهة المستخدم
+local function panelOpenPos()
+    local sw = CAM.ViewportSize.X
+    local pw = panel.AbsoluteSize.X
+    return UDim2.new(0, sw - pw - CBTN_PAD - CBTN_SZ - 8, 0.5, -panel.AbsoluteSize.Y / 2)
+end
+
+local panelOpen = false
+local function openPanel()
+    panelOpen = true
+    panel.Visible = true
+    panel.Position = UDim2.new(1, 10, 0.5, -PH / 2)
+    tw(panel, TSP, {Position = panelOpenPos()})
+    sfx(SFX_BTN)
+end
+
+local function closePanel()
+    panelOpen = false
+    tw(panel, TSL, {Position = UDim2.new(1, panel.AbsoluteSize.X + 30, 0.5, -PH / 2)})
+    task.delay(0.45, function() if not panelOpen then panel.Visible = false end end)
+    sfx(SFX_BTN)
+end
+
+cBtn.MouseButton1Click:Connect(function()
+    if panelOpen then closePanel() else openPanel() end
+end)
+minBtn.MouseButton1Click:Connect(closePanel)
+
+-- تأكيد الإغلاق النهائي للسكربت
+local confirmOpen = false
+xBtn.MouseButton1Click:Connect(function()
+    sfx(SFX_BTN)
+    if confirmOpen then return end
+    confirmOpen = true
+    local cf = mk("Frame", {Size = UDim2.new(1, -28, 0, 80), Position = UDim2.fromOffset(14, 50), BackgroundColor3 = Color3.fromRGB(55, 14, 14), BackgroundTransparency = 0.08, BorderSizePixel = 0, ZIndex = 30}, panel)
+    corner(cf, 10)
+    uistroke(cf, C.RED, 1.2, 0.3)
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 32), Position = UDim2.fromOffset(0, 6), BackgroundTransparency = 1, Text = "إغلاق السكربت نهائياً؟", TextColor3 = C.TEXT, TextSize = 12, Font = Enum.Font.GothamBold, ZIndex = 31}, cf)
+    
+    local function cfBtn(text, xo, col)
+        local b = mk("TextButton", {Size = UDim2.fromOffset(100, 28), Position = UDim2.new(0, xo, 0, 42), BackgroundColor3 = col, Text = text, TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 11, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 32}, cf)
+        corner(b, 6)
+        return b
+    end
+    local yesB = cfBtn("نعم", 12, C.RED)
+    local noB = cfBtn("إلغاء", 122, Color3.fromRGB(38, 40, 58))
+    
+    yesB.MouseButton1Click:Connect(function()
+        sfx(SFX_BTN)
+        if type(_G.ER_CLEANUP) == "function" then _G.ER_CLEANUP() end
+    end)
+    noB.MouseButton1Click:Connect(function()
+        sfx(SFX_BTN)
+        cf:Destroy()
+        confirmOpen = false
+    end)
+end)
+
+-- اختصارات لوحة المفاتيح
+UIS.InputBegan:Connect(function(inp, gp)
+    if gp then return end
+    if inp.KeyCode == Enum.KeyCode.F then setLock(not lockOn()); sfx(SFX_BTN) end
+    if inp.KeyCode == Enum.KeyCode.G then setHop(not hopOn()); sfx(SFX_BTN) end
+end)
+
+-- [8] نظام Lock-On والهدف
+local targetHL = mk("Highlight", {Name = "ER_TargetESP", FillColor = Color3.fromRGB(255, 0, 0), FillTransparency = 0.6, OutlineColor = Color3.fromRGB(255, 255, 255), OutlineTransparency = 0, Enabled = false}, CoreGui)
+local curTarget, lockedName
+
+task.spawn(function()
+    while mainGui.Parent do
+        task.wait(0.25)
+        if not lockOn() and not magnetActive then
+            lockedName = nil
+            curTarget = nil
+            targetHL.Enabled = false
+            targetHL.Adornee = nil
+            continue
+        end
+        local char = lp.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not (char and root) then continue end
+        local myPos = root.Position
+        
+        local best, bestD = nil, math.huge
+        for _, v in ipairs(Players:GetPlayers()) do
+            if v ~= lp and v.Character then
+                local tr = v.Character:FindFirstChild("HumanoidRootPart")
+                local hm = v.Character:FindFirstChild("Humanoid")
+                if tr and hm and hm.Health > 0 then
+                    local d = (myPos - tr.Position).Magnitude
+                    if d < bestD then bestD = d; best = v end
+                end
+            end
+        end
+        if best then
+            curTarget = best
+            targetHL.Adornee = best.Character
+            targetHL.Enabled = true
+        else
+            targetHL.Enabled = false
+            targetHL.Adornee = nil
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not (lockOn() or magnetActive) or not lp.Character then return end
+    local char = lp.Character
+    local hum = char:FindFirstChild("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not (hum and root and curTarget and curTarget.Character) then return end
+    local tr = curTarget.Character:FindFirstChild("HumanoidRootPart")
+    local th = curTarget.Character:FindFirstChild("Humanoid")
+    if not (tr and th and th.Health > 0) then return end
+    hum:MoveTo(tr.Position)
+end)
+
+-- [9] Wall Hop المبسط
+local debounce = true
+local rP = RaycastParams.new()
+rP.FilterType = Enum.RaycastFilterType.Exclude
+
+local function getWall()
+    local c = lp.Character
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    if not r then return nil end
+    rP.FilterDescendantsInstances = {c}
+    for _, d in ipairs({r.CFrame.LookVector, -r.CFrame.LookVector, r.CFrame.RightVector, -r.CFrame.RightVector}) do
+        local ry = workspace:Raycast(r.Position, d * 2.5, rP)
+        if ry then return ry end
+    end
+    return nil
+end
+
+UIS.JumpRequest:Connect(function()
+    if not hopOn() or not debounce then return end
+    local c = lp.Character
+    local hum = c and c:FindFirstChildOfClass("Humanoid")
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    if not (hum and r and hum.Health > 0) then return end
+    local w = getWall()
+    if w then
+        debounce = false
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        task.wait(0.15)
+        debounce = true
+    end
+end)
+
+-- [10] تهيئة الجهاز واسترجاع الإعدادات تلقائياً عند بدء التشغيل
+task.spawn(function()
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    local saved = loadSettings()
+    if saved then
+        spoof.device = saved
+        refreshDevRows()
+        spoofStatusLbl.Text = string.format("✅ مستعاد: %s", saved)
+        spoofStatusLbl.TextColor3 = C.GREEN
+        
+        local Rem = RS:WaitForChild("Remotes", 20)
+        local Repl = Rem and Rem:WaitForChild("Replicator", 20)
+        local SD = Repl and Repl:WaitForChild("SetDevice", 20)
+        if SD then
+            spoof.SD = SD
+            hookSD(SD, saved, function(n)
+                spoof.patches = n
+                spoofStatusLbl.Text = string.format("✅ %s — %d كائن", saved, n)
+                spoofStatusLbl.TextColor3 = C.GREEN
+                refreshDevRows()
+            end)
+            task.spawn(function()
+                task.wait(0.5)
+                spoof.patches = gcWalk(saved)
+                spoofStatusLbl.Text = string.format("✅ %s جاهز", saved)
+                spoofStatusLbl.TextColor3 = C.GREEN
+            end)
+        end
+    else
+        debugLog("لا توجد إعدادات سابقة محفوظة، بانتظار التحديد اليدوي.")
+    end
+end)
+
+queueSelf()
+debugLog("تم تحميل ER Script v5 بنجاح والاستمرارية جاهزة.")
