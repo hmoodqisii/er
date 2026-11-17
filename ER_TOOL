@@ -1,5 +1,3 @@
--- discord.gg/syncrypt
-
 local CORE_CODE = [==[
 local Players         = game:GetService("Players")
 local TweenService    = game:GetService("TweenService")
@@ -22,11 +20,6 @@ if _G.ER_LOADED then
 end
 _G.ER_LOADED = true
 
-local function dbg(msg)
-    print("[ER] " .. tostring(msg))
-end
-dbg("تشغيل ER v6")
-
 local function getGuiParent()
     if typeof(gethui) == "function" then
         local ok, ui = pcall(gethui)
@@ -42,7 +35,105 @@ local function getGuiParent()
     return CoreGui:FindFirstChild("RobloxGui") or PG
 end
 
--- ================= نظام Device (بدون حفظ دائم) =================
+local lockSeen = setmetatable({}, {__mode = "k"})
+local shiftLockOn, cursorRef = false, nil
+
+local function applyCursor()
+    if cursorRef then cursorRef.Visible = shiftLockOn end
+end
+
+local function forceAncestors(inst)
+    local p = inst.Parent
+    while p and p ~= game do
+        if p:IsA("ScreenGui") then
+            if not p.Enabled then p.Enabled = true end
+            if not lockSeen[p] then
+                lockSeen[p] = true
+                p:GetPropertyChangedSignal("Enabled"):Connect(function()
+                    if not p.Enabled and _G.ER_LOADED then p.Enabled = true end
+                end)
+            end
+            break
+        elseif p:IsA("GuiObject") then
+            if not p.Visible then p.Visible = true end
+            if not lockSeen[p] then
+                lockSeen[p] = true
+                p:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if not p.Visible and _G.ER_LOADED then p.Visible = true end
+                end)
+            end
+        end
+        p = p.Parent
+    end
+end
+
+local function lockFix(inst)
+    if lockSeen[inst] then return end
+    local n = inst.Name
+    if n ~= "ConsoleButton" and n ~= "ShiftLockArea" and n ~= "Toggle" and n ~= "MouseLockedCursor" then return end
+    if not inst:IsA("GuiObject") then return end
+
+    if n == "ConsoleButton" then
+        lockSeen[inst] = true
+        inst.Visible = false
+    elseif n == "ShiftLockArea" then
+        lockSeen[inst] = true
+        inst.Visible = true
+        inst:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not inst.Visible and _G.ER_LOADED then inst.Visible = true end
+        end)
+        forceAncestors(inst)
+    elseif n == "Toggle" and inst.Parent and inst.Parent.Name == "ShiftLockArea" then
+        lockSeen[inst] = true
+        inst.Visible = true
+        inst:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not inst.Visible and _G.ER_LOADED then inst.Visible = true end
+        end)
+        forceAncestors(inst)
+        if inst:IsA("GuiButton") then
+            inst.MouseButton1Click:Connect(function()
+                shiftLockOn = not shiftLockOn
+                applyCursor()
+            end)
+        end
+    elseif n == "MouseLockedCursor" then
+        lockSeen[inst] = true
+        cursorRef = inst
+        inst.Visible = shiftLockOn
+        inst:GetPropertyChangedSignal("Visible"):Connect(function()
+            if inst.Visible ~= shiftLockOn and _G.ER_LOADED then inst.Visible = shiftLockOn end
+        end)
+    end
+end
+
+local function watchLock()
+    task.spawn(function()
+        local pg = lp:FindFirstChild("PlayerGui") or lp:WaitForChild("PlayerGui")
+        pg.DescendantAdded:Connect(function(d) pcall(lockFix, d) end)
+        for _, d in ipairs(pg:GetDescendants()) do pcall(lockFix, d) end
+        while _G.ER_LOADED do
+            pcall(function()
+                local area = pg:FindFirstChild("ShiftLockArea", true)
+                if area and area:IsA("GuiObject") then
+                    if lockSeen[area] then
+                        if not area.Visible then area.Visible = true end
+                        local tg = area:FindFirstChild("Toggle")
+                        if tg and tg:IsA("GuiObject") and not tg.Visible then tg.Visible = true end
+                        forceAncestors(area)
+                    else
+                        lockFix(area)
+                        local tg = area:FindFirstChild("Toggle")
+                        if tg then lockFix(tg) end
+                        local cur = pg:FindFirstChild("MouseLockedCursor", true)
+                        if cur then lockFix(cur) end
+                    end
+                end
+            end)
+            task.wait(1.5)
+        end
+    end)
+end
+
 local VALID_DEVICES = {Console = true, Mobile = true, PC = true}
 
 local DeviceSpoofer = {
@@ -66,7 +157,7 @@ local function gcWalk(device)
 
     local n = 0
     for i, obj in ipairs(pool) do
-        if i > 150000 then break end
+        if i > 200000 then break end
         if type(obj) ~= "table" then continue end
 
         local ok1, cur = pcall(rawget, obj, "Device")
@@ -134,6 +225,7 @@ end
 function DeviceSpoofer:apply(device, SD)
     if not VALID_DEVICES[device] then return false end
     self.currentDevice = device
+    watchLock()
     if SD then self:installHook(SD, device) end
     task.spawn(function()
         task.wait(0.5)
@@ -154,7 +246,7 @@ function DeviceSpoofer:cleanup()
     self.applied = false
 end
 
--- ================= نظام True Join (مثل الهالوين تماماً بدون كراش) =================
+-- نظام True Join الخاص بالهالوين بالحرف تماماً
 local TrueJoin = {}
 
 local function asta_hideTeleportError()
@@ -162,8 +254,9 @@ local function asta_hideTeleportError()
         for _ = 1, 30 do
             pcall(function() GuiService:ClearError() end)
             pcall(function()
-                local gui = CoreGui:FindFirstChild("RobloxPromptGui")
-                local ov  = gui and gui:FindFirstChild("promptOverlay")
+                local cg = game:GetService("CoreGui")
+                local gui = cg:FindFirstChild("RobloxPromptGui")
+                local ov = gui and gui:FindFirstChild("promptOverlay")
                 if ov then
                     for _, c in ipairs(ov:GetChildren()) do
                         if c.Name == "ErrorPrompt" then c:Destroy() end
@@ -219,7 +312,6 @@ end
 
 local spoof_SD = nil
 
--- أصوات وتصميم الواجهة
 local function sfx(id)
     local s = Instance.new("Sound")
     s.SoundId = "rbxassetid://" .. tostring(id)
@@ -251,6 +343,29 @@ local function sk(p,col,th,tr) return mk("UIStroke",{Color=col or C.BORDER,Thick
 local function startMainGUI(uiMode)
     local guiParent = getGuiParent()
     local mainGui=mk("ScreenGui",{Name="ER_Main",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=999999},guiParent)
+    if syn and typeof(syn.protect_gui) == "function" then pcall(syn.protect_gui, mainGui) end
+
+    local origL={GlobalShadows=Lighting.GlobalShadows,Brightness=Lighting.Brightness,FogEnd=Lighting.FogEnd}
+    local origE={}
+    for _,v in pairs(Lighting:GetDescendants()) do
+        if v.Name=="ER_Blur" then continue end
+        if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then origE[v]=v.Enabled
+        elseif v:IsA("Atmosphere") then origE[v]=v.Density end
+    end
+    local fpsActive=false
+
+    _G.ER_CLEANUP = function()
+        DeviceSpoofer:cleanup()
+        if mainGui and mainGui.Parent then mainGui:Destroy() end
+        local hl=CoreGui:FindFirstChild("ER_TargetESP"); if hl then hl:Destroy() end
+        if fpsActive then
+            pcall(function()
+                Lighting.GlobalShadows=origL.GlobalShadows; Lighting.Brightness=origL.Brightness; Lighting.FogEnd=origL.FogEnd
+                for v,val in pairs(origE) do pcall(function() if v:IsA("Atmosphere") then v.Density=val else v.Enabled=val end end) end
+            end)
+        end
+        _G.ER_LOADED=false
+    end
 
     local CBTN_SZ,CBTN_PAD=48,14
     local cBtn=mk("TextButton",{
@@ -261,24 +376,86 @@ local function startMainGUI(uiMode)
         AutoButtonColor=false, ClipsDescendants=true, ZIndex=20, Active=true
     },mainGui)
     corner(cBtn,CBTN_SZ/2); local cSK=sk(cBtn,C.GREEN,1.8,0.35)
+    mk("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(28,34,48)),ColorSequenceKeypoint.new(1,Color3.fromRGB(12,14,20))})},cBtn)
+
+    local cDrag=false; local cDragStart,cDragOrig
+    cBtn.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+            cDrag=true; cDragStart=inp.Position; cDragOrig=cBtn.Position
+        end
+    end)
+    cBtn.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+            cDrag=false
+        end
+    end)
+
+    task.spawn(function() while mainGui.Parent do tw(cSK,ti(1.2,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Transparency=0.1}); task.wait(1.2); tw(cSK,ti(1.2,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Transparency=0.55}); task.wait(1.2) end end)
+    cBtn.MouseEnter:Connect(function() tw(cBtn,TF,{BackgroundColor3=Color3.fromRGB(24,30,42)}); tw(cSK,TF,{Thickness=2.2,Transparency=0}) end)
+    cBtn.MouseLeave:Connect(function() tw(cBtn,TF,{BackgroundColor3=C.SURF}); tw(cSK,TF,{Thickness=1.8,Transparency=0.35}) end)
 
     local PW,PH=300,480
     local uiScaleVal = (uiMode == "Mobile") and 0.74 or 1.0
     local panel=mk("Frame",{Size=UDim2.fromOffset(PW,PH),Position=UDim2.new(1,PW+30,0.5,-(PH*uiScaleVal)/2),BackgroundColor3=C.BG,BackgroundTransparency=0.05,ClipsDescendants=true,BorderSizePixel=0,Visible=false,ZIndex=15},mainGui)
     mk("UIScale",{Scale=uiScaleVal},panel)
-    corner(panel,16); sk(panel,C.BORDER,1.1,0.88)
+    corner(panel,16); local pSK=sk(panel,C.BORDER,1.1,0.88)
+    mk("UIGradient",{Rotation=110,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(46,52,76)),ColorSequenceKeypoint.new(0.4,Color3.fromRGB(13,14,21)),ColorSequenceKeypoint.new(1,Color3.fromRGB(7,7,12))}),Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.44),NumberSequenceKeypoint.new(0.4,0.04),NumberSequenceKeypoint.new(1,0)})},panel)
 
     local hdr=mk("Frame",{Size=UDim2.new(1,0,0,50),BackgroundTransparency=1,ZIndex=16},panel)
-    mk("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.fromOffset(16,0),BackgroundTransparency=1,Text="ER Script",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},hdr)
-    
+    mk("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.fromOffset(16,0),BackgroundTransparency=1,Text="ER  Script",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},hdr)
     local function hdrBtn(text,xOff,bgCol)
         local b=mk("TextButton",{Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,xOff,0.5,-14),BackgroundColor3=bgCol or Color3.fromRGB(38,38,52),BackgroundTransparency=0.35,Text=text,TextColor3=Color3.fromRGB(210,210,220),TextSize=16,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=17},hdr)
-        corner(b,8); return b
+        corner(b,8); b.MouseEnter:Connect(function() tw(b,TF,{BackgroundTransparency=0.05}) end); b.MouseLeave:Connect(function() tw(b,TF,{BackgroundTransparency=0.35}) end); return b
     end
     local minBtn=hdrBtn("−",-66); local xBtn=hdrBtn("×",-32,Color3.fromRGB(80,18,18)); xBtn.TextColor3=Color3.fromRGB(220,155,155)
+    mk("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.fromOffset(16,50),BackgroundColor3=C.BORDER,BackgroundTransparency=0.86,BorderSizePixel=0,ZIndex=16},panel)
 
-    -- Device Spoofer UI & Logic داخل القائمة (بدون كراش عند الضغط)
+    local fpsBtn=mk("TextButton",{Size=UDim2.new(1,-32,0,36),Position=UDim2.fromOffset(16,58),BackgroundColor3=Color3.fromRGB(30,80,34),BackgroundTransparency=0.3,Text="⚡  FPS Boost",TextColor3=C.TEXT,TextSize=12,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=16},panel)
+    corner(fpsBtn,10); sk(fpsBtn,C.BORDER,1,0.88)
+    fpsBtn.MouseButton1Click:Connect(function()
+        sfx(SFX_BTN)
+        if not fpsActive then
+            fpsActive=true; Lighting.GlobalShadows=false; Lighting.Brightness=2; Lighting.FogEnd=9e9
+            for _,v in pairs(Lighting:GetDescendants()) do
+                if v.Name=="ER_Blur" then continue end
+                if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then v.Enabled=false
+                elseif v:IsA("Atmosphere") then v.Density=0 end
+            end
+            fpsBtn.Text="⚡  Boosted ✅"; fpsBtn.BackgroundColor3=Color3.fromRGB(28,78,32)
+        else
+            fpsActive=false; Lighting.GlobalShadows=origL.GlobalShadows; Lighting.Brightness=origL.Brightness; Lighting.FogEnd=origL.FogEnd
+            for v,val in pairs(origE) do pcall(function() if v:IsA("Atmosphere") then v.Density=val else v.Enabled=val end end) end
+            fpsBtn.Text="⚡  FPS Boost"; fpsBtn.BackgroundColor3=Color3.fromRGB(30,80,34)
+        end
+    end)
+
+    local function mkToggleRow(label,yPos,colorOn)
+        local bg=mk("Frame",{Size=UDim2.new(1,-32,0,44),Position=UDim2.fromOffset(16,yPos),BackgroundColor3=C.IDLE,BackgroundTransparency=0.3,BorderSizePixel=0,ZIndex=16},panel)
+        corner(bg,11); local skk=sk(bg,C.BORDER,1,0.88)
+        local lbl=mk("TextLabel",{Size=UDim2.new(1,-58,1,0),Position=UDim2.fromOffset(14,0),BackgroundTransparency=1,Text=label,TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},bg)
+        local pill=mk("Frame",{Size=UDim2.fromOffset(44,24),Position=UDim2.new(1,-52,0.5,-12),BackgroundColor3=Color3.fromRGB(38,38,52),BorderSizePixel=0,ZIndex=17},bg); corner(pill,12)
+        local pillSK=sk(pill,C.MUTED,1,0.5)
+        local dot=mk("Frame",{Size=UDim2.fromOffset(18,18),Position=UDim2.fromOffset(3,3),BackgroundColor3=C.MUTED,BorderSizePixel=0,ZIndex=18},pill); corner(dot,9)
+        local btn=mk("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=19},bg)
+        local on=false
+        local function set(state)
+            on=state
+            if on then tw(bg,TSP,{BackgroundColor3=colorOn:Lerp(C.IDLE,0.6)}); tw(skk,TM,{Color=colorOn,Transparency=0.18}); tw(dot,TSP,{BackgroundColor3=colorOn,Position=UDim2.fromOffset(23,3)}); tw(pill,TM,{BackgroundColor3=colorOn:Lerp(C.IDLE,0.72)}); tw(pillSK,TM,{Color=colorOn,Transparency=0.55}); lbl.TextColor3=colorOn
+            else tw(bg,TM,{BackgroundColor3=C.IDLE}); tw(skk,TM,{Color=C.BORDER,Transparency=0.88}); tw(dot,TSP,{BackgroundColor3=C.MUTED,Position=UDim2.fromOffset(3,3)}); tw(pill,TM,{BackgroundColor3=Color3.fromRGB(38,38,52)}); tw(pillSK,TM,{Color=C.MUTED,Transparency=0.5}); lbl.TextColor3=C.TEXT end
+        end
+        btn.MouseButton1Click:Connect(function() sfx(SFX_BTN); set(not on) end)
+        btn.MouseEnter:Connect(function() if not on then tw(bg,TF,{BackgroundColor3=Color3.fromRGB(26,28,44),BackgroundTransparency=0.18}) end end)
+        btn.MouseLeave:Connect(function() if not on then tw(bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.3}) end end)
+        return set,function() return on end
+    end
+
+    mk("TextLabel",{Size=UDim2.new(1,-32,0,22),Position=UDim2.fromOffset(16,106),BackgroundTransparency=1,Text="أدوات القتال",TextColor3=C.MUTED,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+    local setLock,lockOn=mkToggleRow("🎯  Lock-On",130,C.GREEN)
+    local setHop,hopOn=mkToggleRow("🧱  Wall Hop",182,C.BLUE)
+
+    mk("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.fromOffset(16,236),BackgroundColor3=C.BORDER,BackgroundTransparency=0.9,BorderSizePixel=0,ZIndex=16},panel)
     mk("TextLabel",{Size=UDim2.new(1,-32,0,20),Position=UDim2.fromOffset(16,242),BackgroundTransparency=1,Text="Device Spoofer",TextColor3=C.MUTED,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+
     local spoofStatusLbl=mk("TextLabel",{Size=UDim2.new(1,-32,0,18),Position=UDim2.fromOffset(16,264),BackgroundTransparency=1,Text="غير مفعل — اختر جهازاً",TextColor3=C.MUTED,TextSize=10,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
 
     local DEV_CFG={{n="Console",icon="🎮",col=C.CONS},{n="Mobile",icon="📱",col=C.MOB},{n="PC",icon="💻",col=C.PC_COL}}
@@ -287,13 +464,9 @@ local function startMainGUI(uiMode)
     local function refreshDevRows()
         for _,r in ipairs(devRows) do
             local isPend=r.name==devPend; local isSel=r.name==DeviceSpoofer.currentDevice
-            if isPend then 
-                r.lbl.Text="متأكد؟  ←  إعادة الانضمام" 
-            elseif isSel then 
-                r.lbl.Text=r.name.."  ✓" 
-            else 
-                r.lbl.Text=r.name 
-            end
+            if isPend then tw(r.bg,TF,{BackgroundColor3=C.PEND,BackgroundTransparency=0.12}); tw(r.sk,TF,{Color=C.PEND,Transparency=0.1}); r.lbl.Text="متأكد؟  ←  إعادة الانضمام"; r.lbl.TextColor3=Color3.fromRGB(255,220,185)
+            elseif isSel then tw(r.bg,TF,{BackgroundColor3=r.col:Lerp(C.IDLE,0.55),BackgroundTransparency=0.1}); tw(r.sk,TF,{Color=r.col,Transparency=0.15}); r.lbl.Text=r.name.."  ✓"; r.lbl.TextColor3=r.col
+            else tw(r.bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.35}); tw(r.sk,TF,{Color=C.BORDER,Transparency=0.88}); r.lbl.Text=r.name; r.lbl.TextColor3=C.TEXT end
         end
     end
 
@@ -311,13 +484,15 @@ local function startMainGUI(uiMode)
         local lbl=mk("TextLabel",{Size=UDim2.new(1,-50,1,0),Position=UDim2.fromOffset(44,0),BackgroundTransparency=1,Text=cfg.n,TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamMedium,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},bg)
         local btn=mk("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=18},bg)
         table.insert(devRows,{bg=bg,sk=skk,lbl=lbl,name=cfg.n,col=cfg.col})
-        
+        btn.MouseEnter:Connect(function() if devPend~=cfg.n and DeviceSpoofer.currentDevice~=cfg.n then tw(bg,TF,{BackgroundColor3=Color3.fromRGB(26,28,44),BackgroundTransparency=0.2}) end end)
+        btn.MouseLeave:Connect(function() if devPend~=cfg.n and DeviceSpoofer.currentDevice~=cfg.n then tw(bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.35}) end end)
         btn.MouseButton1Click:Connect(function()
             sfx(SFX_BTN)
             if DeviceSpoofer.currentDevice==cfg.n then return end
             if devPend==cfg.n then
                 devPend=nil
-                DeviceSpoofer:apply(cfg.n, spoof_SD)
+                local dev=cfg.n
+                DeviceSpoofer:apply(dev, spoof_SD)
                 lbl.Text="جارٍ إعادة الانضمام..."
                 refreshDevRows()
                 task.spawn(function()
@@ -333,12 +508,155 @@ local function startMainGUI(uiMode)
     end
     refreshDevRows()
 
-    local panelOpen=false
-    local function openPanel() panelOpen=true; panel.Visible=true; sfx(SFX_BTN) end
-    local function closePanel() panelOpen=false; panel.Visible=false; sfx(SFX_BTN) end
+    mk("Frame",{Size=UDim2.new(1,-32,0,1),Position=UDim2.fromOffset(16,432),BackgroundColor3=C.BORDER,BackgroundTransparency=0.9,BorderSizePixel=0,ZIndex=16},panel)
+    mk("TextLabel",{Size=UDim2.new(1,-32,0,22),Position=UDim2.fromOffset(16,436),BackgroundTransparency=1,Text="by bww-o  •  F = Lock-On  •  G = Wall Hop",TextColor3=C.MUTED,TextSize=10,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+
+    local resHandle=mk("Frame",{Size=UDim2.fromOffset(18,18),Position=UDim2.new(1,-18,1,-18),BackgroundColor3=C.GREEN,BackgroundTransparency=0.55,BorderSizePixel=0,ZIndex=25},panel)
+    corner(resHandle,5); mk("TextLabel",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="⤡",TextScaled=true,TextColor3=C.GREEN,ZIndex=26},resHandle)
+    local MIN_W,MIN_H,MAX_W,MAX_H=220,320,500,640
+    local resizing=false; local resSt,resOriW,resOriH
+    resHandle.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+            resizing=true; resSt=inp.Position; resOriW=panel.AbsoluteSize.X/uiScaleVal; resOriH=panel.AbsoluteSize.Y/uiScaleVal
+        end
+    end)
+    resHandle.MouseEnter:Connect(function() tw(resHandle,TF,{BackgroundTransparency=0.15,Size=UDim2.fromOffset(24,24),Position=UDim2.new(1,-24,1,-24)}) end)
+    resHandle.MouseLeave:Connect(function() tw(resHandle,TF,{BackgroundTransparency=0.55,Size=UDim2.fromOffset(18,18),Position=UDim2.new(1,-18,1,-18)}) end)
+
+    local pDragging=false; local pDragSt,pOrigPos; local pDragDist=0
+    local detached=false; local panelOpen=false; local DETACH_THR=32
+    local function panelOpenPos()
+        local sw=CAM.ViewportSize.X; local pw=panel.AbsoluteSize.X
+        return UDim2.new(0,sw-pw-CBTN_PAD-CBTN_SZ-8,0.5,-panel.AbsoluteSize.Y/2)
+    end
+    local function openPanel() panelOpen=true; panel.Visible=true; panel.Position=UDim2.new(1,10,0.5,-panel.AbsoluteSize.Y/2); tw(panel,TSP,{Position=panelOpenPos()}); tw(pSK,TM,{Transparency=0.70}); tw(cSK,TM,{Color=C.GREEN,Transparency=0}); sfx(SFX_BTN) end
+    local function closePanel() panelOpen=false; detached=false; tw(panel,TSL,{Position=UDim2.new(1,panel.AbsoluteSize.X+30,0.5,-panel.AbsoluteSize.Y/2)}); tw(pSK,TM,{Transparency=0.88}); tw(cSK,TM,{Color=C.GREEN,Transparency=0.35}); task.delay(0.46,function() if not panelOpen then panel.Visible=false end end); sfx(SFX_BTN) end
     cBtn.MouseButton1Click:Connect(function() if panelOpen then closePanel() else openPanel() end end)
     minBtn.MouseButton1Click:Connect(closePanel)
-    xBtn.MouseButton1Click:Connect(function() if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end end)
+
+    panel.InputBegan:Connect(function(inp)
+        if inp.UserInputType~=Enum.UserInputType.MouseButton1 and inp.UserInputType~=Enum.UserInputType.Touch then return end
+        local relY=(inp.Position.Y-panel.AbsolutePosition.Y)/uiScaleVal
+        if relY<54 then pDragging=true; pDragSt=inp.Position; pOrigPos=panel.Position; pDragDist=0 end
+    end)
+    panel.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+            pDragging=false
+            if detached then
+                local re=panel.AbsolutePosition.X+panel.AbsoluteSize.X
+                if re>CAM.ViewportSize.X*0.72 then tw(panel,TSP,{Position=panelOpenPos()}); detached=false; tw(pSK,TM,{Color=C.BORDER}) end
+            end
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(inp)
+        local t=inp.UserInputType
+        local isMouse=t==Enum.UserInputType.MouseMovement; local isTouch=t==Enum.UserInputType.Touch
+
+        if cDrag and (isMouse or isTouch) then
+            local delta=inp.Position-cDragStart
+            if delta.Magnitude>5 then
+                cBtn.Position=UDim2.new(cDragOrig.X.Scale,cDragOrig.X.Offset+delta.X,cDragOrig.Y.Scale,cDragOrig.Y.Offset+delta.Y)
+            end
+        end
+
+        if pDragging and (isMouse or isTouch) then
+            local delta=inp.Position-pDragSt; pDragDist=delta.Magnitude
+            if not detached and pDragDist>DETACH_THR then detached=true; sfx(SFX_DETACH); tw(pSK,TM,{Color=C.GOLD,Transparency=0.22}) end
+            if detached then panel.Position=UDim2.new(pOrigPos.X.Scale,pOrigPos.X.Offset+delta.X,pOrigPos.Y.Scale,pOrigPos.Y.Offset+delta.Y) end
+        end
+        if resizing and (isMouse or isTouch) then
+            local d=(inp.Position-resSt)/uiScaleVal
+            local nW=math.clamp(resOriW+d.X,MIN_W,MAX_W); local nH=math.clamp(resOriH+d.Y,MIN_H,MAX_H)
+            panel.Size=UDim2.fromOffset(nW,nH)
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
+            pDragging=false; resizing=false; cDrag=false
+        end
+    end)
+
+    local confirmOpen=false
+    xBtn.MouseButton1Click:Connect(function()
+        sfx(SFX_BTN); if confirmOpen then return end; confirmOpen=true
+        local cf=mk("Frame",{Size=UDim2.new(1,-32,0,86),Position=UDim2.fromOffset(16,56),BackgroundColor3=Color3.fromRGB(55,14,14),BackgroundTransparency=0.08,BorderSizePixel=0,ZIndex=30},panel)
+        corner(cf,12); sk(cf,C.RED,1.2,0.3)
+        mk("TextLabel",{Size=UDim2.new(1,0,0,36),Position=UDim2.fromOffset(0,8),BackgroundTransparency=1,Text="هل تريد إغلاق السكربت نهائياً؟",TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamBold,ZIndex=31},cf)
+        local function cfBtn(text,xo,col) local b=mk("TextButton",{Size=UDim2.fromOffset(108,32),Position=UDim2.new(0,xo,0,46),BackgroundColor3=col,Text=text,TextColor3=Color3.fromRGB(255,255,255),TextScaled=true,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=32},cf); corner(b,8); return b end
+        local yesB=cfBtn("نعم — أغلق",14,C.RED); local noB=cfBtn("لا — ارجع",128,Color3.fromRGB(38,40,58))
+        yesB.MouseButton1Click:Connect(function() sfx(SFX_BTN); if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end end)
+        noB.MouseButton1Click:Connect(function() sfx(SFX_BTN); cf:Destroy(); confirmOpen=false end)
+    end)
+
+    UIS.InputBegan:Connect(function(inp,gp)
+        if gp then return end
+        if inp.KeyCode==Enum.KeyCode.F then setLock(not lockOn()); sfx(SFX_BTN) end
+        if inp.KeyCode==Enum.KeyCode.G then setHop(not hopOn()); sfx(SFX_BTN) end
+    end)
+
+    local targetHL=mk("Highlight",{Name="ER_TargetESP",FillColor=Color3.fromRGB(255,0,0),FillTransparency=0.6,OutlineColor=Color3.fromRGB(255,255,255),OutlineTransparency=0,Enabled=false},CoreGui)
+    local curTarget,lockedName
+    task.spawn(function()
+        while mainGui.Parent do
+            task.wait(0.25)
+            if not lockOn() then lockedName=nil; curTarget=nil; targetHL.Enabled=false; targetHL.Adornee=nil; continue end
+            local char=lp.Character; local root=char and char:FindFirstChild("HumanoidRootPart"); local tool=char and char:FindFirstChildOfClass("Tool")
+            if not (char and root and tool) then lockedName=nil; curTarget=nil; targetHL.Enabled=false; targetHL.Adornee=nil; continue end
+            local myPos=root.Position
+            if lockedName then
+                local tp=Players:FindFirstChild(lockedName)
+                if tp and tp.Character then
+                    local tr=tp.Character:FindFirstChild("HumanoidRootPart"); local th=tp.Character:FindFirstChild("Humanoid")
+                    if tr and th and th.Health>0 and (myPos-tr.Position).Magnitude<=80 then curTarget=tp; targetHL.Adornee=tp.Character; targetHL.Enabled=true; continue end
+                end
+                lockedName=nil; curTarget=nil; targetHL.Enabled=false; targetHL.Adornee=nil
+            end
+            local best,bestD=nil,math.huge
+            for _,v in ipairs(Players:GetPlayers()) do
+                if v~=lp and v.Character then
+                    local tr=v.Character:FindFirstChild("HumanoidRootPart"); local hm=v.Character:FindFirstChild("Humanoid")
+                    if tr and hm and hm.Health>0 then local d=(myPos-tr.Position).Magnitude; if d<bestD then bestD=d; best=v end end
+                end
+            end
+            if best then lockedName=best.Name; curTarget=best; targetHL.Adornee=best.Character; targetHL.Enabled=true
+            else targetHL.Enabled=false; targetHL.Adornee=nil end
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not lockOn() or not lp.Character then return end
+        local char=lp.Character; local hum=char:FindFirstChild("Humanoid"); local root=char:FindFirstChild("HumanoidRootPart"); local tool=char:FindFirstChildOfClass("Tool")
+        if not (hum and root and tool and curTarget and curTarget.Character) then return end
+        local tr=curTarget.Character:FindFirstChild("HumanoidRootPart"); local th=curTarget.Character:FindFirstChild("Humanoid")
+        if not (tr and th and th.Health>0) then return end
+        hum:MoveTo(tr.Position); if (root.Position-tr.Position).Magnitude<2 then hum:MoveTo(tr.Position+tr.CFrame.LookVector*2) end
+    end)
+
+    local debounce=true; local rP=RaycastParams.new(); rP.FilterType=Enum.RaycastFilterType.Exclude
+    local function getWall()
+        local c=lp.Character; local r=c and c:FindFirstChild("HumanoidRootPart"); if not r then return nil end
+        rP.FilterDescendantsInstances={c}; local h,md=nil,2.6
+        for _,d in ipairs({r.CFrame.LookVector,-r.CFrame.LookVector,r.CFrame.RightVector,-r.CFrame.RightVector}) do
+            local ry=workspace:Raycast(r.Position,d*2.5,rP); if ry and ry.Distance<md then md=ry.Distance; h=ry end
+        end; return h
+    end
+    UIS.JumpRequest:Connect(function()
+        if not hopOn() or not debounce then return end
+        local c=lp.Character; local hum=c and c:FindFirstChildOfClass("Humanoid"); local r=c and c:FindFirstChild("HumanoidRootPart")
+        if not (hum and r and hum.Health>0) then return end
+        local w=getWall(); if not w then return end
+        debounce=false; local wn=w.Normal; local hwn=Vector3.new(wn.X,0,wn.Z).Unit
+        if hwn.Magnitude<0.1 then hwn=(r.CFrame.LookVector*Vector3.new(1,0,1)).Unit end
+        local b=hwn; local hcl=Vector3.new(CAM.CFrame.LookVector.X,0,CAM.CFrame.LookVector.Z).Unit
+        local dt=math.clamp(b:Dot(hcl),-1,1); local ab=math.acos(dt); local cr=b:Cross(hcl); local rs=math.sign(cr.Y)
+        if rs==0 then ab=0 end
+        local it=CFrame.Angles(0,math.min(ab,math.rad(40))*rs,0)*b
+        r.CFrame=CFrame.lookAt(r.Position,r.Position+it); RunService.Heartbeat:Wait()
+        hum:ChangeState(Enum.HumanoidStateType.Jumping); r.CFrame=CFrame.lookAt(r.Position,r.Position-b)
+        task.wait(0.15); debounce=true
+    end)
 
     task.spawn(function()
         if not game:IsLoaded() then game.Loaded:Wait() end
@@ -347,30 +665,38 @@ local function startMainGUI(uiMode)
         local SD=Repl:WaitForChild("SetDevice",25); if not SD then return end
         spoof_SD=SD
     end)
+
+    lp.CharacterAdded:Connect(function()
+        if DeviceSpoofer.currentDevice and spoof_SD then
+            task.spawn(function()
+                task.wait(1)
+                DeviceSpoofer.patchCount=gcWalk(DeviceSpoofer.currentDevice)
+            end)
+        end
+    end)
 end
 
--- واجهة اختيار وضع العرض لأول مرة (بدون حفظ)
-do
-    local guiParent = getGuiParent()
-    local ig=mk("ScreenGui",{Name="ER_Intro",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=2000000},guiParent)
-    local ibg=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0},ig)
-    
-    local selFrame=mk("Frame",{Size=UDim2.fromOffset(340,150),Position=UDim2.new(0.5,-170,0.52,-75),BackgroundColor3=C.SURF,BackgroundTransparency=0.08,ZIndex=10},ibg)
-    corner(selFrame,16); sk(selFrame,C.GREEN,1.4,0.4)
-    mk("TextLabel",{Size=UDim2.new(1,0,0,42),Position=UDim2.fromOffset(0,10),BackgroundTransparency=1,Text="اختر حجم الواجهة المناسب لجهازك",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,ZIndex=11},selFrame)
+local guiParent = getGuiParent()
+local ig=mk("ScreenGui",{Name="ER_Intro",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=2000000},guiParent)
+local ibg=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0},ig)
 
-    local function mkModeBtn(txt,xOff,col,mode)
-        local b=mk("TextButton",{Size=UDim2.fromOffset(145,54),Position=UDim2.new(0,xOff,0,68),BackgroundColor3=C.IDLE,Text=txt,TextColor3=C.TEXT,TextSize=15,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=11},selFrame)
-        corner(b,12)
-        b.MouseButton1Click:Connect(function()
-            sfx(SFX_BTN)
-            ig:Destroy()
-            startMainGUI(mode)
-        end)
-    end
-    mkModeBtn("💻  PC",18,C.PC_COL,"PC")
-    mkModeBtn("📱  Mobile",177,C.MOB,"Mobile")
+local selFrame=mk("Frame",{Size=UDim2.fromOffset(340,150),Position=UDim2.new(0.5,-170,0.52,-75),BackgroundColor3=C.SURF,BackgroundTransparency=0.08,ZIndex=10},ibg)
+corner(selFrame,16); sk(selFrame,C.GREEN,1.4,0.4)
+mk("TextLabel",{Size=UDim2.new(1,0,0,42),Position=UDim2.fromOffset(0,10),BackgroundTransparency=1,Text="اختر حجم الواجهة المناسب لجهازك",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,ZIndex=11},selFrame)
+
+local function mkModeBtn(txt,xOff,col,mode)
+    local b=mk("TextButton",{Size=UDim2.fromOffset(145,54),Position=UDim2.new(0,xOff,0,68),BackgroundColor3=C.IDLE,Text=txt,TextColor3=C.TEXT,TextSize=15,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=11},selFrame)
+    corner(b,12); local bst=sk(b,col,1.3,0.45)
+    b.MouseEnter:Connect(function() tw(b,TF,{BackgroundColor3=col:Lerp(C.IDLE,0.65)}); tw(bst,TF,{Transparency=0.1}) end)
+    b.MouseLeave:Connect(function() tw(b,TF,{BackgroundColor3=C.IDLE}); tw(bst,TF,{Transparency=0.45}) end)
+    b.MouseButton1Click:Connect(function()
+        sfx(SFX_BTN)
+        ig:Destroy()
+        startMainGUI(mode)
+    end)
 end
+mkModeBtn("💻  PC",18,C.PC_COL,"PC")
+mkModeBtn("📱  Mobile",177,C.MOB,"Mobile")
 ]==]
 
 local chunk, err = loadstring(CORE_CODE)
