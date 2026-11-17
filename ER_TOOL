@@ -25,12 +25,6 @@ local lp  = Players.LocalPlayer
 local PG  = lp:WaitForChild("PlayerGui")
 local CAM = workspace.CurrentCamera
 
--- إعدادات مؤقتة تنتقل فقط خلال إعادة الانضمام، دون حفظها في ملفات.
-local ER_BOOT_DEVICE = _G.ER_NEXT_DEVICE
-local ER_BOOT_UI = _G.ER_NEXT_UI
-_G.ER_NEXT_DEVICE = nil
-_G.ER_NEXT_UI = nil
-
 -- ═══════════════════════════════════════
 --  منع التشغيل المزدوج
 -- ═══════════════════════════════════════
@@ -61,6 +55,43 @@ local function getGuiParent()
     end
     return CoreGui:FindFirstChild("RobloxGui") or PG
 end
+
+-- ═══════════════════════════════════════
+--  نظام الحفظ — مستقل
+-- ═══════════════════════════════════════
+local FOLDER = "ER_Settings"
+
+local Storage = {}
+
+function Storage.init()
+    if isfolder and not isfolder(FOLDER) then
+        if makefolder then pcall(makefolder, FOLDER) end
+    end
+end
+
+function Storage.save(key, value)
+    if not writefile then dbg("writefile غير متاح"); return false end
+    local ok = pcall(writefile, FOLDER .. "/" .. key .. ".bin", tostring(value))
+    if ok then dbg("حُفظ: " .. key .. " = " .. tostring(value)) end
+    return ok
+end
+
+function Storage.load(key)
+    if not readfile then return nil end
+    local path = FOLDER .. "/" .. key .. ".bin"
+    if isfile and not isfile(path) then return nil end
+    local ok, v = pcall(readfile, path)
+    if ok and v and #v > 0 then return v:match("^%s*(.-)%s*$") end
+    return nil
+end
+
+function Storage.delete(key)
+    if not delfile then return end
+    local path = FOLDER .. "/" .. key .. ".bin"
+    if isfile and isfile(path) then pcall(delfile, path) end
+end
+
+Storage.init()
 
 -- ═══════════════════════════════════════
 --  إصلاح اختفاء ShiftLock عند اختيار PC أو Console
@@ -310,6 +341,7 @@ end
 function DeviceSpoofer:apply(device, SD)
     if not VALID_DEVICES[device] then return false end
     self.currentDevice = device
+    Storage.save("device", device)
     watchLock()
     if SD then self:installHook(SD, device) end
     task.spawn(function()
@@ -329,11 +361,12 @@ function DeviceSpoofer:cleanup()
         self.hookCleanup = nil
     end
     self.applied = false
+    Storage.delete("device")
     dbg("DeviceSpoofer: cleanup")
 end
 
 -- ═══════════════════════════════════════
---  True Join — آلية إعادة الانضمام وإعادة التطبيق
+--  نظام True Join — مأخوذ من ASTA Halloween
 -- ═══════════════════════════════════════
 local TrueJoin = {}
 
@@ -343,7 +376,7 @@ local function hideTeleportError()
             pcall(function() GuiService:ClearError() end)
             pcall(function()
                 local gui = CoreGui:FindFirstChild("RobloxPromptGui")
-                local ov = gui and gui:FindFirstChild("promptOverlay")
+                local ov  = gui and gui:FindFirstChild("promptOverlay")
                 if ov then
                     for _, c in ipairs(ov:GetChildren()) do
                         if c.Name == "ErrorPrompt" then c:Destroy() end
@@ -355,62 +388,32 @@ local function hideTeleportError()
     end)
 end
 
-function TrueJoin.queueReload(device, uiMode)
-    if type(queue_on_teleport) ~= "function" then
-        dbg("queue_on_teleport غير متاح؛ لن يتم تحميل السكربت تلقائياً بعد الانتقال")
-        return false
-    end
-
-    if not VALID_DEVICES[device] then return false end
-    if uiMode ~= "PC" and uiMode ~= "Mobile" then uiMode = "PC" end
-
-    local code = "_G.ER_NEXT_DEVICE = " .. string.format("%q", device) .. "; "
-        .. "_G.ER_NEXT_UI = " .. string.format("%q", uiMode) .. "; "
+function TrueJoin.queueReload()
+    if type(queue_on_teleport) ~= "function" then return false end
+    local savedDev   = Storage.load("device")   or ""
+    local savedUIMode = Storage.load("ui_mode") or ""
+    local code = "_G.ER_SAVED_DEV = '" .. tostring(savedDev) .. "'; "
+        .. "_G.ER_SAVED_UI = '" .. tostring(savedUIMode) .. "'; "
         .. "pcall(function() local f = readfile('ER_v6_core.lua'); loadstring(f)() end)"
-
-    local ok = pcall(queue_on_teleport, code)
-    if not ok then dbg("تعذر تجهيز إعادة تحميل ER بعد الانتقال") end
-    return ok
+    pcall(queue_on_teleport, code)
+    return true
 end
 
-function TrueJoin.rejoin(placeId, jobId, device, uiMode, SD)
-    if not VALID_DEVICES[device] then
-        dbg("TrueJoin: جهاز غير صالح")
-        return false
-    end
-
-    DeviceSpoofer.currentDevice = device
-    TrueJoin.queueReload(device, uiMode)
+-- الدالة الرئيسية — نفس منطق ASTA تماماً
+function TrueJoin.rejoin(placeId, jobId)
+    TrueJoin.queueReload()
 
     local finished, stage, conn = false, 1, nil
 
-    local function applyInPlace()
+    local function finish(result, msg)
         if finished then return end
         finished = true
         if conn then conn:Disconnect(); conn = nil end
-        hideTeleportError()
-
-        DeviceSpoofer.currentDevice = device
-        watchLock()
-        if SD then
-            pcall(function() DeviceSpoofer:installHook(SD, device) end)
-        end
-
-        -- إعادة تطبيق الجهاز عدة مرات إذا تعذر الانتقال، مثل آلية ASTA.
-        for i = 1, 10 do
-            task.delay((i - 1) * 0.6, function()
-                if not _G.ER_LOADED then return end
-                pcall(gcWalk, device)
-            end)
-        end
-        dbg("تعذرت إعادة الانضمام؛ أُعيد تطبيق " .. device .. " في السيرفر الحالي")
-    end
-
-    local function finish(result, msg)
         if result ~= nil or msg ~= nil then
             dbg("Rejoin failed: " .. tostring(result) .. " | " .. tostring(msg))
         end
-        applyInPlace()
+        -- لو فشل الريجوين: نطبّق الجهاز في مكانه بدل ما يقفل
+        hideTeleportError()
     end
 
     local function tryAsync()
@@ -426,9 +429,7 @@ function TrueJoin.rejoin(placeId, jobId, device, uiMode, SD)
         hideTeleportError()
         if stage == 1 then
             stage = 2
-            task.spawn(function()
-                if not tryAsync() then finish(result, msg) end
-            end)
+            task.spawn(function() if not tryAsync() then finish(result, msg) end end)
         else
             finish(result, msg)
         end
@@ -440,15 +441,10 @@ function TrueJoin.rejoin(placeId, jobId, device, uiMode, SD)
 
     if not okTp then
         stage = 2
-        task.spawn(function()
-            if not tryAsync() then finish("pcall", "teleport api error") end
-        end)
+        task.spawn(function() if not tryAsync() then finish("pcall", "teleport api error") end end)
     end
 
-    task.delay(10, function()
-        if not finished then finish() end
-    end)
-    return true
+    task.delay(10, function() if not finished then finish() end end)
 end
 
 -- ═══════════════════════════════════════
@@ -456,7 +452,7 @@ end
 -- ═══════════════════════════════════════
 local spoof_SD = nil
 do
-    local earlyDev = ER_BOOT_DEVICE
+    local earlyDev = _G.ER_SAVED_DEV or Storage.load("device")
     if earlyDev and VALID_DEVICES[earlyDev] then
         DeviceSpoofer.currentDevice = earlyDev
         watchLock()
@@ -666,7 +662,7 @@ local function startMainGUI(uiMode)
                 refreshDevRows()
                 task.spawn(function()
                     task.wait(0.4)
-                    TrueJoin.rejoin(game.PlaceId, game.JobId, dev, uiMode, spoof_SD)
+                    TrueJoin.rejoin(game.PlaceId, game.JobId)
                 end)
             else
                 -- ضغطة أولى: pending فقط
@@ -834,9 +830,9 @@ local function startMainGUI(uiMode)
         local Repl=Rem:WaitForChild("Replicator",25); if not Repl then return end
         local SD=Repl:WaitForChild("SetDevice",25); if not SD then return end
         spoof_SD=SD
-        local saved=ER_BOOT_DEVICE or DeviceSpoofer.currentDevice
+        local saved=_G.ER_SAVED_DEV or Storage.load("device")
         if saved and VALID_DEVICES[saved] then
-            dbg("استعادة الجهاز المحدد بعد الانتقال: " .. saved)
+            dbg("استعادة جهاز محفوظ: " .. saved)
             DeviceSpoofer.currentDevice=saved
             watchLock()
             refreshDevRows()
@@ -878,10 +874,9 @@ end
 -- ═══════════════════════════════════════
 --  Intro Screen ثم لوحة اختيار الواجهة
 -- ═══════════════════════════════════════
-local startupUIMode = ER_BOOT_UI or _G.ER_UI_MODE
-if startupUIMode == "PC" or startupUIMode == "Mobile" then
-    _G.ER_UI_MODE = startupUIMode
-    startMainGUI(startupUIMode)
+local savedUIMode = Storage.load("ui_mode")
+if _G.ER_INTRO_SHOWN and (savedUIMode == "PC" or savedUIMode == "Mobile") then
+    startMainGUI(savedUIMode)
 else
     _G.ER_INTRO_SHOWN = true
     local guiParent = getGuiParent()
@@ -905,7 +900,7 @@ else
         b.MouseLeave:Connect(function() tw(b,TF,{BackgroundColor3=C.IDLE}); tw(bst,TF,{Transparency=0.45}) end)
         b.MouseButton1Click:Connect(function()
             sfx(SFX_BTN)
-            _G.ER_UI_MODE = mode
+            Storage.save("ui_mode", mode)
             ig:Destroy()
             startMainGUI(mode)
         end)
