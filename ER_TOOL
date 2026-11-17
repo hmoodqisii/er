@@ -246,7 +246,7 @@ function DeviceSpoofer:cleanup()
     self.applied = false
 end
 
--- نظام True Join الخاص بالهالوين بالحرف تماماً
+-- نظام True Join مع تفعيل queue_on_teleport لضمان العمل بعد الانتقال
 local TrueJoin = {}
 
 local function asta_hideTeleportError()
@@ -268,7 +268,14 @@ local function asta_hideTeleportError()
     end)
 end
 
+function TrueJoin.queueReload()
+    if type(queue_on_teleport) == "function" then
+        pcall(queue_on_teleport, "pcall(function() local f = readfile('ER_v6_core.lua'); loadstring(f)() end)")
+    end
+end
+
 function TrueJoin.rejoin(placeId, jobId)
+    TrueJoin.queueReload()
     asta_hideTeleportError()
     local finished, stage, conn = false, 1, nil
 
