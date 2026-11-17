@@ -1,348 +1,381 @@
 -- discord.gg/syncrypt
 
-if writefile then
-	pcall(writefile, "Asta_Halloween_core.lua", [[local SRC = [==[local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local CORE_CODE = [==[
+local Players         = game:GetService("Players")
+local TweenService    = game:GetService("TweenService")
+local RunService      = game:GetService("RunService")
+local UIS             = game:GetService("UserInputService")
+local GuiService      = game:GetService("GuiService")
+local CoreGui         = game:GetService("CoreGui")
+local Lighting        = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local GuiService = game:GetService("GuiService")
-local ALLOWED_PLACES = {[11379739543] = true, [98752102030179] = true}
-local BRAND = "ASTA Halloween"
-local DISPLAY = {Console = "🎮  Console", Mobile = "📱  Mobile", PC = "🖥  PC"}
-local ALERT_DIST = 20   -- أحمر
-local WARN_DIST  = 50   -- برتقالي
-local MAX_ENEMIES = 6
+local RS              = game:GetService("ReplicatedStorage")
+local SS              = game:GetService("SoundService")
+local Debris          = game:GetService("Debris")
 
--- 🎃 ألوان هالوين
-local C = {
-  orange = Color3.fromRGB(255, 128, 0),
-  orange2 = Color3.fromRGB(255, 176, 48),
-  purple = Color3.fromRGB(140, 60, 220),
-  purple2 = Color3.fromRGB(62, 22, 108),
-  slime = Color3.fromRGB(130, 255, 70),
-  blood = Color3.fromRGB(205, 30, 45),
-  bg = Color3.fromRGB(16, 9, 24),
-  card = Color3.fromRGB(34, 19, 50),
-  off = Color3.fromRGB(62, 50, 78),
-  text = Color3.fromRGB(246, 236, 255),
-  dim = Color3.fromRGB(165, 145, 190),
+local lp  = Players.LocalPlayer
+local PG  = lp:WaitForChild("PlayerGui")
+local CAM = workspace.CurrentCamera
+
+if _G.ER_LOADED then
+    if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end
+end
+_G.ER_LOADED = true
+
+local function dbg(msg)
+    print("[ER] " .. tostring(msg))
+end
+dbg("تشغيل ER v6")
+
+local function getGuiParent()
+    if typeof(gethui) == "function" then
+        local ok, ui = pcall(gethui)
+        if ok and ui then return ui end
+    end
+    if typeof(get_hidden_gui) == "function" then
+        local ok, ui = pcall(get_hidden_gui)
+        if ok and ui then return ui end
+    end
+    if syn and typeof(syn.protect_gui) == "function" then
+        return CoreGui
+    end
+    return CoreGui:FindFirstChild("RobloxGui") or PG
+end
+
+-- ================= نظام Device (بدون حفظ دائم) =================
+local VALID_DEVICES = {Console = true, Mobile = true, PC = true}
+
+local DeviceSpoofer = {
+    currentDevice = nil,
+    hookCleanup   = nil,
+    applied       = false,
+    patchCount    = 0,
+    listeners     = {},
 }
 
--- لو السكربت شغال من قبل: يطفي النسخة القديمة أول
-if _G.__asta_hw_kill then pcall(_G.__asta_hw_kill); task.wait(0.7) end
+local function canHook()
+    if hookmetamethod and newcclosure and getrawmetatable and setreadonly then return "meta" end
+    if hookfunction and newcclosure then return "func" end
+    return nil
+end
 
-local function setTargetDevice(device)
-  if device == "Pc" or device == "pc" then device = "PC" end
-  _G.TargetDevice = device
+local function gcWalk(device)
+    if not getgc then return 0 end
+    local ok, pool = pcall(function() return getgc(true) end)
+    if not ok or type(pool) ~= "table" then return 0 end
+
+    local n = 0
+    for i, obj in ipairs(pool) do
+        if i > 150000 then break end
+        if type(obj) ~= "table" then continue end
+
+        local ok1, cur = pcall(rawget, obj, "Device")
+        if ok1 and VALID_DEVICES[cur] and cur ~= device then
+            pcall(rawset, obj, "Device", device)
+            n += 1
+        end
+    end
+    return n
 end
-local function getTargetDevice()
-  local d = _G.TargetDevice
-  if d == "Pc" or d == "pc" then d = "PC" end
-  return d
-end
-local function randomName()
-  local text = ""
-  for _ = 1, math.random(10, 16) do
-    text = text .. string.char(math.random(97, 122))
-  end
-  return text
-end
-local lockSeen = setmetatable({}, {__mode = "k"})
-local lockOn, cursorRef = false, nil
-local function applyCursor()
-  if cursorRef then cursorRef.Visible = lockOn end
-end
-local function forceAncestors(inst)
-  local p = inst.Parent
-  while p and p ~= game do
-    if p:IsA("ScreenGui") then
-      if not p.Enabled then p.Enabled = true end
-      if not lockSeen[p] then
-        lockSeen[p] = true
-        p:GetPropertyChangedSignal("Enabled"):Connect(function()
-          if not p.Enabled and not _G.__dm_killed then p.Enabled = true end
+
+function DeviceSpoofer:installHook(SD, device)
+    if self.hookCleanup then
+        pcall(self.hookCleanup)
+        self.hookCleanup = nil
+    end
+
+    local mode = canHook()
+    if not mode then return false end
+
+    local fired = false
+    local self_ = self
+
+    if mode == "meta" then
+        local mt = getrawmetatable(game)
+        if not mt then return false end
+        local origNC = mt.__namecall
+
+        local ok = pcall(function()
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(obj, ...)
+                local method = getnamecallmethod()
+                if method == "FireServer" and obj == SD and not fired then
+                    if checkcaller and checkcaller() then
+                        return origNC(obj, ...)
+                    end
+                    fired = true
+                    self_.applied = true
+                    task.spawn(function()
+                        local n = gcWalk(device)
+                        self_.patchCount = n
+                        for _, fn in ipairs(self_.listeners) do pcall(fn, device, n) end
+                    end)
+                    return origNC(obj, device)
+                end
+                return origNC(obj, ...)
+            end)
+            setreadonly(mt, true)
         end)
-      end
-      break
-    elseif p:IsA("GuiObject") then
-      if not p.Visible then p.Visible = true end
-      if not lockSeen[p] then
-        lockSeen[p] = true
-        p:GetPropertyChangedSignal("Visible"):Connect(function()
-          if not p.Visible and not _G.__dm_killed then p.Visible = true end
-        end)
-      end
-    end
-    p = p.Parent
-  end
-end
-local function lockFix(inst)
-  if lockSeen[inst] then return end
-  local n = inst.Name
-  if n ~= "ConsoleButton" and n ~= "ShiftLockArea" and n ~= "Toggle" and n ~= "MouseLockedCursor" then return end
-  if not inst:IsA("GuiObject") then return end
-  if n == "ConsoleButton" then
-    lockSeen[inst] = true
-    inst.Visible = false
-  elseif n == "ShiftLockArea" then
-    lockSeen[inst] = true
-    inst.Visible = true
-    inst:GetPropertyChangedSignal("Visible"):Connect(function()
-      if not inst.Visible and not _G.__dm_killed then inst.Visible = true end
-    end)
-    forceAncestors(inst)
-  elseif n == "Toggle" and inst.Parent and inst.Parent.Name == "ShiftLockArea" then
-    lockSeen[inst] = true
-    inst.Visible = true
-    inst:GetPropertyChangedSignal("Visible"):Connect(function()
-      if not inst.Visible and not _G.__dm_killed then inst.Visible = true end
-    end)
-    forceAncestors(inst)
-    if inst:IsA("GuiButton") then
-      inst.MouseButton1Click:Connect(function()
-        lockOn = not lockOn
-        applyCursor()
-      end)
-    end
-  elseif n == "MouseLockedCursor" then
-    lockSeen[inst] = true
-    cursorRef = inst
-    inst.Visible = lockOn
-    inst:GetPropertyChangedSignal("Visible"):Connect(function()
-      if inst.Visible ~= lockOn and not _G.__dm_killed then inst.Visible = lockOn end
-    end)
-  end
-end
-local function watchLock()
-  local lp = Players.LocalPlayer
-  if not lp then return end
-  task.spawn(function()
-    local pg = lp:FindFirstChild("PlayerGui") or lp:WaitForChild("PlayerGui")
-    pg.DescendantAdded:Connect(function(d) pcall(lockFix, d) end)
-    for _, d in ipairs(pg:GetDescendants()) do pcall(lockFix, d) end
-    local t0 = os.clock()
-    while os.clock() - t0 < 60 and not _G.__dm_killed do
-      pcall(function()
-        local area = pg:FindFirstChild("ShiftLockArea", true)
-        if area and area:IsA("GuiObject") then
-          if lockSeen[area] then
-            if not area.Visible then area.Visible = true end
-            local tg = area:FindFirstChild("Toggle")
-            if tg and tg:IsA("GuiObject") and not tg.Visible then tg.Visible = true end
-            forceAncestors(area)
-          else
-            lockFix(area)
-            local tg = area:FindFirstChild("Toggle")
-            if tg then lockFix(tg) end
-            local cur = pg:FindFirstChild("MouseLockedCursor", true)
-            if cur then lockFix(cur) end
-          end
+
+        if ok then
+            self.hookCleanup = function()
+                pcall(function()
+                    setreadonly(mt, false)
+                    mt.__namecall = origNC
+                    setreadonly(mt, true)
+                end)
+            end
+            return true
         end
-      end)
-      task.wait(2)
     end
-  end)
+    return false
 end
-local patchedCache = setmetatable({}, {__mode = "k"})
-local scanning = false
-local lastFullScan = 0
-local DEVICE_KEYS = {"Device", "Platform", "DeviceType", "DeviceName", "InputDevice", "Platform_", "CurrentDevice", "CurrentPlatform", "PlayerDevice", "PlayerPlatform"}
-local function isDevValue(v) return v == "Mobile" or v == "PC" or v == "Console" end
-local function unlockTable(t)
-  if type(isreadonly) == "function" and type(setreadonly) == "function" then
-    local okR, ro = pcall(isreadonly, t)
-    if okR and ro then pcall(setreadonly, t, false) end
-  elseif type(make_writeable) == "function" then
-    pcall(make_writeable, t)
-  end
+
+function DeviceSpoofer:apply(device, SD)
+    if not VALID_DEVICES[device] then return false end
+    self.currentDevice = device
+    if SD then self:installHook(SD, device) end
+    task.spawn(function()
+        task.wait(0.5)
+        self.patchCount = gcWalk(device)
+    end)
+    return true
 end
-local function patchTable(obj, device)
-  local patched, relevant = 0, false
-  for _, keyName in ipairs(DEVICE_KEYS) do
-    local okK, cur = pcall(rawget, obj, keyName)
-    if okK and isDevValue(cur) then
-      relevant = true
-      if cur ~= device then
-        unlockTable(obj)
-        if pcall(rawset, obj, keyName, device) then
-          patched = patched + 1
-          if keyName == "Device" then
-            local fix = rawget(obj, "FixXCoordinateAspectRate")
-            if type(fix) == "function" then pcall(fix, obj) end
-          end
-        end
-      end
+
+function DeviceSpoofer:onApplied(fn)
+    table.insert(self.listeners, fn)
+end
+
+function DeviceSpoofer:cleanup()
+    if self.hookCleanup then
+        pcall(self.hookCleanup)
+        self.hookCleanup = nil
     end
-  end
-  return patched, relevant
+    self.applied = false
 end
-local function collectCandidates()
-  local list = {}
-  if type(filtergc) == "function" then
-    local keys = {"PreferredInput"}
-    for _, k in ipairs(DEVICE_KEYS) do keys[#keys + 1] = k end
-    for _, key in ipairs(keys) do
-      local ok, res = pcall(filtergc, "table", {Keys = {key}}, false)
-      if ok and type(res) == "table" then
-        for _, t in ipairs(res) do list[#list + 1] = t end
-      end
-    end
-    if #list > 0 then return list end
-  end
-  if type(getgc) ~= "function" then return list end
-  local ok, objs = pcall(getgc, true)
-  if not ok or type(objs) ~= "table" then return list end
-  local n = 0
-  for _, o in ipairs(objs) do
-    n = n + 1
-    if type(o) == "table" then list[#list + 1] = o end
-    if n % 40000 == 0 then task.wait() end
-  end
-  return list
-end
-local function spoofDeviceInGc(device, fast)
-  if not device then return 0, 0 end
-  local patched, scanned = 0, 0
-  for t in pairs(patchedCache) do
-    patched = patched + (patchTable(t, device))
-  end
-  if fast then return patched, 0 end
-  if os.clock() - (_G.__asta_t0 or 0) > 30 and next(patchedCache) ~= nil then return patched, 0 end
-  local gap = (os.clock() - (_G.__asta_t0 or 0) < 15) and 4 or 60
-  if scanning or os.clock() - lastFullScan < gap then return patched, 0 end
-  if not (type(filtergc) == "function" or type(getgc) == "function") then return patched, 0 end
-  _G.__asta_nscans = (_G.__asta_nscans or 0) + 1
-  if _G.__asta_nscans > 3 and os.clock() - (_G.__asta_t0 or 0) < 60 then _G.__asta_nscans = 3; return patched, 0 end
-  scanning = true
-  lastFullScan = os.clock()
-  pcall(function()
-    local list = collectCandidates()
-    for _, obj in ipairs(list) do
-      scanned = scanned + 1
-      if scanned > 120000 then break end
-      if scanned % 4000 == 0 then task.wait() end
-      local p, rel = patchTable(obj, device)
-      patched = patched + p
-      if rel then patchedCache[obj] = true end
-    end
-  end)
-  scanning = false
-  return patched, scanned
-end
-local function spoofDeviceExtra(device)
-  local lp = Players.LocalPlayer
-  if not (device and lp) then return end
-  local function fixAttrs(inst)
-    local ok, attrs = pcall(function() return inst:GetAttributes() end)
-    if ok and attrs then
-      for k, v in pairs(attrs) do
-        if v == "Mobile" or v == "PC" or v == "Console" then
-          pcall(function() inst:SetAttribute(k, device) end)
-        end
-      end
-    end
-  end
-  fixAttrs(lp)
-  if lp.Character then fixAttrs(lp.Character) end
-end
-local function getGuiParent()
-  if typeof(gethui) == "function" then
-    local ok, ui = pcall(gethui)
-    if ok and ui then return ui end
-  end
-  local CoreGui = game:GetService("CoreGui")
-  if syn and typeof(syn.protect_gui) == "function" then return CoreGui end
-  local localPlayer = Players.LocalPlayer
-  return CoreGui:FindFirstChild("RobloxGui") or (localPlayer and localPlayer:WaitForChild("PlayerGui"))
-end
+
+-- ================= نظام True Join (مثل الهالوين تماماً بدون كراش) =================
+local TrueJoin = {}
+
 local function asta_hideTeleportError()
-  task.spawn(function()
-    for _ = 1, 30 do
-      pcall(function() game:GetService("GuiService"):ClearError() end)
-      pcall(function()
-        local cg = game:GetService("CoreGui")
-        local gui = cg:FindFirstChild("RobloxPromptGui")
-        local ov = gui and gui:FindFirstChild("promptOverlay")
-        if ov then
-          for _, c in ipairs(ov:GetChildren()) do
-            if c.Name == "ErrorPrompt" then c:Destroy() end
-          end
+    task.spawn(function()
+        for _ = 1, 30 do
+            pcall(function() GuiService:ClearError() end)
+            pcall(function()
+                local gui = CoreGui:FindFirstChild("RobloxPromptGui")
+                local ov  = gui and gui:FindFirstChild("promptOverlay")
+                if ov then
+                    for _, c in ipairs(ov:GetChildren()) do
+                        if c.Name == "ErrorPrompt" then c:Destroy() end
+                    end
+                end
+            end)
+            task.wait(0.1)
         end
-      end)
-      task.wait(0.1)
-    end
-  end)
-end
-local function asta_queueReload()
-  if type(queue_on_teleport) ~= "function" then return end
-  local dev = _G.TargetDevice or "PC"
-  local code = "_G.TargetDevice = '" .. tostring(dev) .. "'; "
-    .. "pcall(function() local f = readfile('Asta_Halloween_core.lua'); loadstring(f)() end)"
-  pcall(queue_on_teleport, code)
-end
-local function asta_installHooks()
-  if _G.__asta_hooked or type(hookmetamethod) ~= "function" then return end
-  _G.__asta_hooked = true
-  pcall(function()
-    local UIS = game:GetService("UserInputService")
-    local GS = game:GetService("GuiService")
-    local isCaller = type(checkcaller) == "function" and checkcaller or function() return false end
-    local function gameCaller()
-      if type(getcallingscript) ~= "function" then return false end
-      local ok, sc = pcall(getcallingscript)
-      if not ok or typeof(sc) ~= "Instance" then return false end
-      local okA, core = pcall(function()
-        return sc.Name == "PlayerModule" or sc:FindFirstAncestor("PlayerModule") ~= nil
-      end)
-      return not (okA and core)
-    end
-    local wrap = type(newcclosure) == "function" and newcclosure or function(f) return f end
-    local oldIdx
-    oldIdx = hookmetamethod(game, "__index", wrap(function(self, key)
-      if _G.__asta_hookoff then return oldIdx(self, key) end
-      if self == UIS and type(key) == "string" then
-        local dev = _G.TargetDevice
-        if dev and (key == "TouchEnabled" or key == "KeyboardEnabled" or key == "MouseEnabled" or key == "GamepadEnabled") then
-          if not isCaller() and gameCaller() then
-            if key == "TouchEnabled" then return dev == "Mobile" end
-            if key == "GamepadEnabled" then return dev == "Console" end
-            return dev == "PC"
-          end
-        end
-      end
-      return oldIdx(self, key)
-    end))
-  end)
-end
-local function asta_notify(text)
-  pcall(function()
-    local g = Instance.new("ScreenGui")
-    g.Name = randomName()
-    g.ResetOnSpawn = false
-    g.IgnoreGuiInset = true
-    g.DisplayOrder = 999
-    g.Parent = getGuiParent()
-    local l = Instance.new("TextLabel")
-    l.Size = UDim2.fromOffset(340, 56)
-    l.Position = UDim2.new(0.5, -170, 0, 12)
-    l.BackgroundColor3 = Color3.fromRGB(15, 16, 22)
-    l.TextColor3 = Color3.fromRGB(255, 220, 120)
-    l.TextWrapped = true
-    l.TextSize = 13
-    l.Font = Enum.Font.GothamMedium
-    l.Text = text
-    l.Parent = g
-    Instance.new("UICorner", l).CornerRadius = UDim.new(0, 10)
-    task.delay(12, function() g:Destroy() end)
-  end)
+    end)
 end
 
-_G.__dm_killed = false
-local lp = Players.LocalPlayer
-if not game:IsLoaded() then game.Loaded:Wait() end
-asta_installHooks()
+function TrueJoin.rejoin(placeId, jobId)
+    asta_hideTeleportError()
+    local finished, stage, conn = false, 1, nil
 
--- بقية كود المميزات والواجهة يعمل بنجاح تام --
-]==] loadstring(SRC)()]])
+    local function finish(result, msg)
+        if finished then return end
+        finished = true
+        if conn then conn:Disconnect(); conn = nil end
+        asta_hideTeleportError()
+    end
+
+    local function tryAsync()
+        return pcall(function()
+            local opts = Instance.new("TeleportOptions")
+            opts.ServerInstanceId = jobId
+            TeleportService:TeleportAsync(placeId, {lp}, opts)
+        end)
+    end
+
+    conn = TeleportService.TeleportInitFailed:Connect(function(_, result, msg)
+        if finished then return end
+        asta_hideTeleportError()
+        if stage == 1 then
+            stage = 2
+            task.spawn(function() if not tryAsync() then finish(result, msg) end end)
+        else
+            finish(result, msg)
+        end
+    end)
+
+    local okTp = pcall(function()
+        TeleportService:TeleportToPlaceInstance(placeId, jobId, lp)
+    end)
+
+    if not okTp then
+        stage = 2
+        task.spawn(function() if not tryAsync() then finish("pcall", "teleport api error") end end)
+    end
+
+    task.delay(10, function() if not finished then finish() end end)
+end
+
+local spoof_SD = nil
+
+-- أصوات وتصميم الواجهة
+local function sfx(id)
+    local s = Instance.new("Sound")
+    s.SoundId = "rbxassetid://" .. tostring(id)
+    s.Volume = 0.55; s.Parent = SS; s:Play()
+    Debris:AddItem(s, 5)
+end
+local SFX_DETACH = 12221944
+local SFX_BTN    = 12221967
+
+local C = {
+    BG=Color3.fromRGB(9,9,14), SURF=Color3.fromRGB(16,17,26),
+    TEXT=Color3.fromRGB(228,230,244), MUTED=Color3.fromRGB(90,92,118),
+    BORDER=Color3.fromRGB(255,255,255), GREEN=Color3.fromRGB(45,215,90),
+    BLUE=Color3.fromRGB(55,135,255), GOLD=Color3.fromRGB(238,185,42),
+    RED=Color3.fromRGB(215,55,55), IDLE=Color3.fromRGB(20,22,34),
+    PEND=Color3.fromRGB(215,105,20), CONS=Color3.fromRGB(95,55,195),
+    MOB=Color3.fromRGB(25,145,215), PC_COL=Color3.fromRGB(38,175,85),
+}
+local function ti(t,s,d) return TweenInfo.new(t,s or Enum.EasingStyle.Quad,d or Enum.EasingDirection.Out) end
+local TF=ti(0.15); local TM=ti(0.26); local TSP=ti(0.36,Enum.EasingStyle.Back); local TSL=ti(0.44)
+local function tw(o,i,p) TweenService:Create(o,i,p):Play() end
+local function mk(cls,props,parent)
+    local o=Instance.new(cls); for k,v in pairs(props) do o[k]=v end
+    if parent then o.Parent=parent end; return o
+end
+local function corner(p,r) return mk("UICorner",{CornerRadius=UDim.new(0,r or 12)},p) end
+local function sk(p,col,th,tr) return mk("UIStroke",{Color=col or C.BORDER,Thickness=th or 1.2,Transparency=tr or 0.80},p) end
+
+local function startMainGUI(uiMode)
+    local guiParent = getGuiParent()
+    local mainGui=mk("ScreenGui",{Name="ER_Main",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=999999},guiParent)
+
+    local CBTN_SZ,CBTN_PAD=48,14
+    local cBtn=mk("TextButton",{
+        Size=UDim2.fromOffset(CBTN_SZ,CBTN_SZ),
+        Position=UDim2.new(1,-(CBTN_SZ+CBTN_PAD),0.18,-CBTN_SZ/2),
+        BackgroundColor3=C.SURF, Text="ER",
+        TextColor3=C.GREEN, Font=Enum.Font.GothamBlack, TextSize=15,
+        AutoButtonColor=false, ClipsDescendants=true, ZIndex=20, Active=true
+    },mainGui)
+    corner(cBtn,CBTN_SZ/2); local cSK=sk(cBtn,C.GREEN,1.8,0.35)
+
+    local PW,PH=300,480
+    local uiScaleVal = (uiMode == "Mobile") and 0.74 or 1.0
+    local panel=mk("Frame",{Size=UDim2.fromOffset(PW,PH),Position=UDim2.new(1,PW+30,0.5,-(PH*uiScaleVal)/2),BackgroundColor3=C.BG,BackgroundTransparency=0.05,ClipsDescendants=true,BorderSizePixel=0,Visible=false,ZIndex=15},mainGui)
+    mk("UIScale",{Scale=uiScaleVal},panel)
+    corner(panel,16); sk(panel,C.BORDER,1.1,0.88)
+
+    local hdr=mk("Frame",{Size=UDim2.new(1,0,0,50),BackgroundTransparency=1,ZIndex=16},panel)
+    mk("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.fromOffset(16,0),BackgroundTransparency=1,Text="ER Script",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},hdr)
+    
+    local function hdrBtn(text,xOff,bgCol)
+        local b=mk("TextButton",{Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,xOff,0.5,-14),BackgroundColor3=bgCol or Color3.fromRGB(38,38,52),BackgroundTransparency=0.35,Text=text,TextColor3=Color3.fromRGB(210,210,220),TextSize=16,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=17},hdr)
+        corner(b,8); return b
+    end
+    local minBtn=hdrBtn("−",-66); local xBtn=hdrBtn("×",-32,Color3.fromRGB(80,18,18)); xBtn.TextColor3=Color3.fromRGB(220,155,155)
+
+    -- Device Spoofer UI & Logic داخل القائمة (بدون كراش عند الضغط)
+    mk("TextLabel",{Size=UDim2.new(1,-32,0,20),Position=UDim2.fromOffset(16,242),BackgroundTransparency=1,Text="Device Spoofer",TextColor3=C.MUTED,TextSize=11,Font=Enum.Font.GothamBold,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+    local spoofStatusLbl=mk("TextLabel",{Size=UDim2.new(1,-32,0,18),Position=UDim2.fromOffset(16,264),BackgroundTransparency=1,Text="غير مفعل — اختر جهازاً",TextColor3=C.MUTED,TextSize=10,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=16},panel)
+
+    local DEV_CFG={{n="Console",icon="🎮",col=C.CONS},{n="Mobile",icon="📱",col=C.MOB},{n="PC",icon="💻",col=C.PC_COL}}
+    local devRows={}; local devPend=nil
+
+    local function refreshDevRows()
+        for _,r in ipairs(devRows) do
+            local isPend=r.name==devPend; local isSel=r.name==DeviceSpoofer.currentDevice
+            if isPend then 
+                r.lbl.Text="متأكد؟  ←  إعادة الانضمام" 
+            elseif isSel then 
+                r.lbl.Text=r.name.."  ✓" 
+            else 
+                r.lbl.Text=r.name 
+            end
+        end
+    end
+
+    DeviceSpoofer:onApplied(function(device, n)
+        spoofStatusLbl.Text = string.format("✅ %s — %d كائن", device, n)
+        spoofStatusLbl.TextColor3 = C.GREEN
+        refreshDevRows()
+    end)
+
+    for i,cfg in ipairs(DEV_CFG) do
+        local yP=288+(i-1)*46
+        local bg=mk("Frame",{Size=UDim2.new(1,-32,0,40),Position=UDim2.fromOffset(16,yP),BackgroundColor3=C.IDLE,BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=16},panel)
+        corner(bg,10); local skk=sk(bg,C.BORDER,1,0.88)
+        mk("TextLabel",{Size=UDim2.fromOffset(32,40),Position=UDim2.fromOffset(10,0),BackgroundTransparency=1,Text=cfg.icon,TextScaled=true,ZIndex=17},bg)
+        local lbl=mk("TextLabel",{Size=UDim2.new(1,-50,1,0),Position=UDim2.fromOffset(44,0),BackgroundTransparency=1,Text=cfg.n,TextColor3=C.TEXT,TextSize=13,Font=Enum.Font.GothamMedium,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=17},bg)
+        local btn=mk("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=18},bg)
+        table.insert(devRows,{bg=bg,sk=skk,lbl=lbl,name=cfg.n,col=cfg.col})
+        
+        btn.MouseButton1Click:Connect(function()
+            sfx(SFX_BTN)
+            if DeviceSpoofer.currentDevice==cfg.n then return end
+            if devPend==cfg.n then
+                devPend=nil
+                DeviceSpoofer:apply(cfg.n, spoof_SD)
+                lbl.Text="جارٍ إعادة الانضمام..."
+                refreshDevRows()
+                task.spawn(function()
+                    task.wait(0.4)
+                    TrueJoin.rejoin(game.PlaceId, game.JobId)
+                end)
+            else
+                if devPend then devPend=nil; refreshDevRows() end
+                devPend=cfg.n; refreshDevRows()
+                task.delay(4.5,function() if devPend==cfg.n then devPend=nil; refreshDevRows() end end)
+            end
+        end)
+    end
+    refreshDevRows()
+
+    local panelOpen=false
+    local function openPanel() panelOpen=true; panel.Visible=true; sfx(SFX_BTN) end
+    local function closePanel() panelOpen=false; panel.Visible=false; sfx(SFX_BTN) end
+    cBtn.MouseButton1Click:Connect(function() if panelOpen then closePanel() else openPanel() end end)
+    minBtn.MouseButton1Click:Connect(closePanel)
+    xBtn.MouseButton1Click:Connect(function() if _G.ER_CLEANUP then pcall(_G.ER_CLEANUP) end end)
+
+    task.spawn(function()
+        if not game:IsLoaded() then game.Loaded:Wait() end
+        local Rem=RS:WaitForChild("Remotes",25); if not Rem then return end
+        local Repl=Rem:WaitForChild("Replicator",25); if not Repl then return end
+        local SD=Repl:WaitForChild("SetDevice",25); if not SD then return end
+        spoof_SD=SD
+    end)
+end
+
+-- واجهة اختيار وضع العرض لأول مرة (بدون حفظ)
+do
+    local guiParent = getGuiParent()
+    local ig=mk("ScreenGui",{Name="ER_Intro",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=2000000},guiParent)
+    local ibg=mk("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0},ig)
+    
+    local selFrame=mk("Frame",{Size=UDim2.fromOffset(340,150),Position=UDim2.new(0.5,-170,0.52,-75),BackgroundColor3=C.SURF,BackgroundTransparency=0.08,ZIndex=10},ibg)
+    corner(selFrame,16); sk(selFrame,C.GREEN,1.4,0.4)
+    mk("TextLabel",{Size=UDim2.new(1,0,0,42),Position=UDim2.fromOffset(0,10),BackgroundTransparency=1,Text="اختر حجم الواجهة المناسب لجهازك",TextColor3=C.TEXT,TextSize=14,Font=Enum.Font.GothamBold,ZIndex=11},selFrame)
+
+    local function mkModeBtn(txt,xOff,col,mode)
+        local b=mk("TextButton",{Size=UDim2.fromOffset(145,54),Position=UDim2.new(0,xOff,0,68),BackgroundColor3=C.IDLE,Text=txt,TextColor3=C.TEXT,TextSize=15,Font=Enum.Font.GothamBold,AutoButtonColor=false,ZIndex=11},selFrame)
+        corner(b,12)
+        b.MouseButton1Click:Connect(function()
+            sfx(SFX_BTN)
+            ig:Destroy()
+            startMainGUI(mode)
+        end)
+    end
+    mkModeBtn("💻  PC",18,C.PC_COL,"PC")
+    mkModeBtn("📱  Mobile",177,C.MOB,"Mobile")
+end
+]==]
+
+local chunk, err = loadstring(CORE_CODE)
+if chunk then
+    chunk()
+else
+    warn("[ER] " .. tostring(err))
 end
