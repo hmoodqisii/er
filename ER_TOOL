@@ -196,7 +196,7 @@ local function watchLock()
 end
 
 -- ═══════════════════════════════════════
---  نظام Device Spoofer — مستقل
+--  نظام Device Spoofer — آمن تماماً
 -- ═══════════════════════════════════════
 local VALID_DEVICES = {Console = true, Mobile = true, PC = true}
 
@@ -209,8 +209,13 @@ local DeviceSpoofer = {
 }
 
 local function canHook()
-    if hookmetamethod and newcclosure and getrawmetatable and setreadonly then return "meta" end
-    if hookfunction and newcclosure then return "func" end
+    local okMeta = pcall(function() return getrawmetatable and setreadonly and newcclosure end)
+    if okMeta and getrawmetatable and setreadonly and newcclosure then
+        local mt = pcall(getrawmetatable, game)
+        if mt then return "meta" end
+    end
+    local okFunc = pcall(function() return hookfunction and newcclosure end)
+    if okFunc and hookfunction and newcclosure then return "func" end
     return nil
 end
 
@@ -262,10 +267,7 @@ function DeviceSpoofer:installHook(SD, device)
     end
 
     local mode = canHook()
-    if not mode then
-        dbg("لا توجد طريقة hook متاحة")
-        return false
-    end
+    if not mode then return false end
 
     local fired = false
     local self_ = self
@@ -275,7 +277,7 @@ function DeviceSpoofer:installHook(SD, device)
         if not mt then return false end
         local origNC = mt.__namecall
 
-        local ok = pcall(function()
+        local success = pcall(function()
             setreadonly(mt, false)
             mt.__namecall = newcclosure(function(obj, ...)
                 local method = getnamecallmethod()
@@ -288,7 +290,6 @@ function DeviceSpoofer:installHook(SD, device)
                     task.spawn(function()
                         local n = gcWalk(device)
                         self_.patchCount = n
-                        dbg("Hook نجح ← " .. device .. " (" .. n .. " كائن)")
                         for _, fn in ipairs(self_.listeners) do pcall(fn, device, n) end
                     end)
                     return origNC(obj, device)
@@ -298,7 +299,7 @@ function DeviceSpoofer:installHook(SD, device)
             setreadonly(mt, true)
         end)
 
-        if ok then
+        if success then
             self.hookCleanup = function()
                 pcall(function()
                     setreadonly(mt, false)
@@ -306,13 +307,11 @@ function DeviceSpoofer:installHook(SD, device)
                     setreadonly(mt, true)
                 end)
             end
-            dbg("Hook مثبّت عبر hookmetamethod")
             return true
         end
-
     elseif mode == "func" then
         local old
-        local ok = pcall(function()
+        local success = pcall(function()
             old = hookfunction(SD.FireServer, newcclosure(function(obj, ...)
                 if obj == SD and not fired then
                     fired = true
@@ -320,7 +319,6 @@ function DeviceSpoofer:installHook(SD, device)
                     task.spawn(function()
                         local n = gcWalk(device)
                         self_.patchCount = n
-                        dbg("Hook نجح ← " .. device)
                         for _, fn in ipairs(self_.listeners) do pcall(fn, device, n) end
                     end)
                     return old(obj, device)
@@ -328,13 +326,11 @@ function DeviceSpoofer:installHook(SD, device)
                 return old(obj, ...)
             end))
         end)
-        if ok then
+        if success then
             self.hookCleanup = function() pcall(hookfunction, SD.FireServer, old) end
-            dbg("Hook مثبّت عبر hookfunction")
             return true
         end
     end
-
     return false
 end
 
@@ -343,9 +339,9 @@ function DeviceSpoofer:apply(device, SD)
     self.currentDevice = device
     Storage.save("device", device)
     watchLock()
-    if SD then self:installHook(SD, device) end
+    if SD then pcall(function() self:installHook(SD, device) end) end
     task.spawn(function()
-        task.wait(0.5)
+        task.wait(0.3)
         self.patchCount = gcWalk(device)
     end)
     return true
@@ -362,11 +358,10 @@ function DeviceSpoofer:cleanup()
     end
     self.applied = false
     Storage.delete("device")
-    dbg("DeviceSpoofer: cleanup")
 end
 
 -- ═══════════════════════════════════════
---  نظام True Join — مأخوذ من ASTA Halloween
+--  نظام True Join
 -- ═══════════════════════════════════════
 local TrueJoin = {}
 
@@ -399,20 +394,14 @@ function TrueJoin.queueReload()
     return true
 end
 
--- الدالة الرئيسية — نفس منطق ASTA تماماً
 function TrueJoin.rejoin(placeId, jobId)
     TrueJoin.queueReload()
-
     local finished, stage, conn = false, 1, nil
 
     local function finish(result, msg)
         if finished then return end
         finished = true
         if conn then conn:Disconnect(); conn = nil end
-        if result ~= nil or msg ~= nil then
-            dbg("Rejoin failed: " .. tostring(result) .. " | " .. tostring(msg))
-        end
-        -- لو فشل الريجوين: نطبّق الجهاز في مكانه بدل ما يقفل
         hideTeleportError()
     end
 
@@ -447,9 +436,6 @@ function TrueJoin.rejoin(placeId, jobId)
     task.delay(10, function() if not finished then finish() end end)
 end
 
--- ═══════════════════════════════════════
---  تطبيق مبكر فقط لو تم اختياره مسبقاً
--- ═══════════════════════════════════════
 local spoof_SD = nil
 do
     local earlyDev = _G.ER_SAVED_DEV or Storage.load("device")
@@ -466,9 +452,6 @@ do
     end
 end
 
--- ═══════════════════════════════════════
---  أصوات
--- ═══════════════════════════════════════
 local function sfx(id)
     local s = Instance.new("Sound")
     s.SoundId = "rbxassetid://" .. tostring(id)
@@ -478,9 +461,6 @@ end
 local SFX_DETACH = 12221944
 local SFX_BTN    = 12221967
 
--- ═══════════════════════════════════════
---  ألوان وـ Tweens
--- ═══════════════════════════════════════
 local C = {
     BG=Color3.fromRGB(9,9,14), SURF=Color3.fromRGB(16,17,26),
     TEXT=Color3.fromRGB(228,230,244), MUTED=Color3.fromRGB(90,92,118),
@@ -500,9 +480,6 @@ end
 local function corner(p,r) return mk("UICorner",{CornerRadius=UDim.new(0,r or 12)},p) end
 local function sk(p,col,th,tr) return mk("UIStroke",{Color=col or C.BORDER,Thickness=th or 1.2,Transparency=tr or 0.80},p) end
 
--- ═══════════════════════════════════════
---  بناء الواجهة الرئيسية (Main GUI)
--- ═══════════════════════════════════════
 local function startMainGUI(uiMode)
     local guiParent = getGuiParent()
     local mainGui=mk("ScreenGui",{Name="ER_Main",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=999999},guiParent)
@@ -528,7 +505,6 @@ local function startMainGUI(uiMode)
             end)
         end
         _G.ER_LOADED=false
-        dbg("Cleanup مكتمل")
     end
 
     local CBTN_SZ,CBTN_PAD=48,14
@@ -650,22 +626,21 @@ local function startMainGUI(uiMode)
         table.insert(devRows,{bg=bg,sk=skk,lbl=lbl,name=cfg.n,col=cfg.col})
         btn.MouseEnter:Connect(function() if devPend~=cfg.n and DeviceSpoofer.currentDevice~=cfg.n then tw(bg,TF,{BackgroundColor3=Color3.fromRGB(26,28,44),BackgroundTransparency=0.2}) end end)
         btn.MouseLeave:Connect(function() if devPend~=cfg.n and DeviceSpoofer.currentDevice~=cfg.n then tw(bg,TF,{BackgroundColor3=C.IDLE,BackgroundTransparency=0.35}) end end)
+        
+        -- التصليح الجذري لمنع الطرد الفوري: حفظ الإعداد فقط وعدم عمل Hook ثقيل أثناء الضغطة
         btn.MouseButton1Click:Connect(function()
             sfx(SFX_BTN)
             if DeviceSpoofer.currentDevice==cfg.n then return end
             if devPend==cfg.n then
-                -- ضغطة ثانية: تأكيد — نفس منطق ASTA
                 devPend=nil
-                local dev=cfg.n
-                DeviceSpoofer:apply(dev, spoof_SD)
+                Storage.save("device", cfg.n)
                 lbl.Text="جارٍ إعادة الانضمام..."
                 refreshDevRows()
                 task.spawn(function()
-                    task.wait(0.4)
+                    task.wait(0.3)
                     TrueJoin.rejoin(game.PlaceId, game.JobId)
                 end)
             else
-                -- ضغطة أولى: pending فقط
                 if devPend then devPend=nil; refreshDevRows() end
                 devPend=cfg.n; refreshDevRows()
                 task.delay(4.5,function() if devPend==cfg.n then devPend=nil; refreshDevRows() end end)
@@ -832,13 +807,12 @@ local function startMainGUI(uiMode)
         spoof_SD=SD
         local saved=_G.ER_SAVED_DEV or Storage.load("device")
         if saved and VALID_DEVICES[saved] then
-            dbg("استعادة جهاز محفوظ: " .. saved)
             DeviceSpoofer.currentDevice=saved
             watchLock()
             refreshDevRows()
-            spoofStatusLbl.Text="⏳ " .. saved .. " — جارٍ تطبيق Hook..."
+            spoofStatusLbl.Text="⏳ " .. saved .. " — جارٍ التطبيق..."
             spoofStatusLbl.TextColor3=C.GOLD
-            DeviceSpoofer:installHook(SD, saved)
+            pcall(function() DeviceSpoofer:installHook(SD, saved) end)
             task.spawn(function()
                 task.wait(0.8)
                 local n=gcWalk(saved)
@@ -848,32 +822,8 @@ local function startMainGUI(uiMode)
             end)
         end
     end)
-
-    task.spawn(function()
-        while mainGui.Parent do task.wait(4)
-            if DeviceSpoofer.currentDevice and DeviceSpoofer.patchCount>0 then
-                spoofStatusLbl.Text=string.format("✅ %s — %d كائن",DeviceSpoofer.currentDevice,DeviceSpoofer.patchCount)
-                spoofStatusLbl.TextColor3=C.GREEN
-            elseif DeviceSpoofer.currentDevice and DeviceSpoofer.applied then
-                spoofStatusLbl.Text="✅ " .. DeviceSpoofer.currentDevice .. " — Hook جاهز"
-                spoofStatusLbl.TextColor3=C.GREEN
-            end
-        end
-    end)
-
-    lp.CharacterAdded:Connect(function()
-        if DeviceSpoofer.currentDevice and spoof_SD then
-            task.spawn(function()
-                task.wait(1)
-                DeviceSpoofer.patchCount=gcWalk(DeviceSpoofer.currentDevice)
-            end)
-        end
-    end)
 end
 
--- ═══════════════════════════════════════
---  Intro Screen ثم لوحة اختيار الواجهة
--- ═══════════════════════════════════════
 local savedUIMode = Storage.load("ui_mode")
 if _G.ER_INTRO_SHOWN and (savedUIMode == "PC" or savedUIMode == "Mobile") then
     startMainGUI(savedUIMode)
