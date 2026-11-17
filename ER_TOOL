@@ -366,7 +366,7 @@ function DeviceSpoofer:cleanup()
 end
 
 -- ═══════════════════════════════════════
---  نظام True Join
+--  نظام True Join — مأخوذ من ASTA Halloween
 -- ═══════════════════════════════════════
 local TrueJoin = {}
 
@@ -376,7 +376,7 @@ local function hideTeleportError()
             pcall(function() GuiService:ClearError() end)
             pcall(function()
                 local gui = CoreGui:FindFirstChild("RobloxPromptGui")
-                local ov = gui and gui:FindFirstChild("promptOverlay")
+                local ov  = gui and gui:FindFirstChild("promptOverlay")
                 if ov then
                     for _, c in ipairs(ov:GetChildren()) do
                         if c.Name == "ErrorPrompt" then c:Destroy() end
@@ -390,7 +390,7 @@ end
 
 function TrueJoin.queueReload()
     if type(queue_on_teleport) ~= "function" then return false end
-    local savedDev = Storage.load("device") or ""
+    local savedDev   = Storage.load("device")   or ""
     local savedUIMode = Storage.load("ui_mode") or ""
     local code = "_G.ER_SAVED_DEV = '" .. tostring(savedDev) .. "'; "
         .. "_G.ER_SAVED_UI = '" .. tostring(savedUIMode) .. "'; "
@@ -399,51 +399,52 @@ function TrueJoin.queueReload()
     return true
 end
 
-function TrueJoin.teleport(placeId, jobId)
-    Storage.save("last_place", tostring(placeId))
-    Storage.save("last_job",   tostring(jobId or ""))
+-- الدالة الرئيسية — نفس منطق ASTA تماماً
+function TrueJoin.rejoin(placeId, jobId)
     TrueJoin.queueReload()
 
     local finished, stage, conn = false, 1, nil
-    local function finish(reason)
+
+    local function finish(result, msg)
         if finished then return end
         finished = true
         if conn then conn:Disconnect(); conn = nil end
+        if result ~= nil or msg ~= nil then
+            dbg("Rejoin failed: " .. tostring(result) .. " | " .. tostring(msg))
+        end
+        -- لو فشل الريجوين: نطبّق الجهاز في مكانه بدل ما يقفل
         hideTeleportError()
     end
 
     local function tryAsync()
         return pcall(function()
             local opts = Instance.new("TeleportOptions")
-            if jobId and jobId ~= "" then opts.ServerInstanceId = jobId end
+            opts.ServerInstanceId = jobId
             TeleportService:TeleportAsync(placeId, {lp}, opts)
         end)
     end
 
-    conn = TeleportService.TeleportInitFailed:Connect(function(player, result, msg)
-        if player ~= lp or finished then return end
+    conn = TeleportService.TeleportInitFailed:Connect(function(_, result, msg)
+        if finished then return end
         hideTeleportError()
         if stage == 1 then
             stage = 2
-            task.spawn(function() if not tryAsync() then finish(msg) end end)
+            task.spawn(function() if not tryAsync() then finish(result, msg) end end)
         else
-            finish(msg)
+            finish(result, msg)
         end
     end)
 
-    local okTp
-    if jobId and jobId ~= "" then
-        okTp = pcall(function() TeleportService:TeleportToPlaceInstance(placeId, jobId, lp) end)
-    else
-        okTp = pcall(function() TeleportService:Teleport(placeId, lp) end)
-    end
+    local okTp = pcall(function()
+        TeleportService:TeleportToPlaceInstance(placeId, jobId, lp)
+    end)
 
     if not okTp then
         stage = 2
-        task.spawn(function() if not tryAsync() then finish("teleport api error") end end)
+        task.spawn(function() if not tryAsync() then finish("pcall", "teleport api error") end end)
     end
 
-    task.delay(10, function() if not finished then finish("timeout") end end)
+    task.delay(10, function() if not finished then finish() end end)
 end
 
 -- ═══════════════════════════════════════
@@ -653,6 +654,7 @@ local function startMainGUI(uiMode)
             sfx(SFX_BTN)
             if DeviceSpoofer.currentDevice==cfg.n then return end
             if devPend==cfg.n then
+                -- ضغطة ثانية: تأكيد — نفس منطق ASTA
                 devPend=nil
                 local dev=cfg.n
                 DeviceSpoofer:apply(dev, spoof_SD)
@@ -660,9 +662,10 @@ local function startMainGUI(uiMode)
                 refreshDevRows()
                 task.spawn(function()
                     task.wait(0.4)
-                    TrueJoin.teleport(game.PlaceId, game.JobId)
+                    TrueJoin.rejoin(game.PlaceId, game.JobId)
                 end)
             else
+                -- ضغطة أولى: pending فقط
                 if devPend then devPend=nil; refreshDevRows() end
                 devPend=cfg.n; refreshDevRows()
                 task.delay(4.5,function() if devPend==cfg.n then devPend=nil; refreshDevRows() end end)
@@ -869,7 +872,7 @@ local function startMainGUI(uiMode)
 end
 
 -- ═══════════════════════════════════════
---  Intro Screen ثم لوحة اختيار الواجهة (بدون اختيار جهاز افتراضي)
+--  Intro Screen ثم لوحة اختيار الواجهة
 -- ═══════════════════════════════════════
 local savedUIMode = Storage.load("ui_mode")
 if _G.ER_INTRO_SHOWN and (savedUIMode == "PC" or savedUIMode == "Mobile") then
